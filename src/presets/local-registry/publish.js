@@ -2,28 +2,15 @@ const { join: joinPath, parse: parsePath } = require("path");
 const { mkdir, access, writeFile, readFile } = require("fs/promises");
 const { recursive: recursiveMerge } = require("merge");
 
-const { registryDirPath, config } = require("../../config");
 const { reqPromise } = require("../../req-promise");
 const { joinChunks } = require("../../join-chunks");
 
-const { packageInfoFile } = config;
-
-async function guard(req) {
-  return req.method === "PUT";
-}
-
-async function handler(req, res) {
+async function handler(options, req, res) {
   const info = await takeInfo(req);
   const version = await takePackageVersion(info);
 
-  try {
-    await writeTarball({ req, res, info, version });
-    await writeInfo({ req, res, info, version });
-  } catch (error) {
-    console.log(error);
-    res.statusCode = 400;
-  }
-
+  await writeTarball({ options, req, res, info, version });
+  await writeInfo({ options, req, res, info, version });
   res.end();
 }
 
@@ -39,17 +26,19 @@ async function takePackageVersion(info) {
   return info.versions[version];
 }
 
-async function writeInfo({ req, info }) {
+async function writeInfo({ options, req, info }) {
+  const { registryDirPath, infoFile } = options;
   const url = decodeURIComponent(req.url);
   const dirPath = joinPath(registryDirPath, url);
-  const filePath = joinPath(dirPath, packageInfoFile);
+  const filePath = joinPath(dirPath, infoFile);
   const nextInfo = await buildInfo({ filePath, info });
 
   await mkdir(dirPath, { recursive: true });
   await writeFile(filePath, JSON.stringify(nextInfo, null, 2));
 }
 
-async function writeTarball({ version, info }) {
+async function writeTarball({ options, version, info }) {
+  const { registryDirPath } = options;
   const pathname = parsePath(new URL(version.dist.tarball).pathname);
   const dirPath = joinPath(registryDirPath, pathname.dir);
   const filePath = joinPath(dirPath, pathname.base);
@@ -76,4 +65,4 @@ async function readInfo(path) {
   }
 }
 
-module.exports = { guard, handler };
+module.exports = handler;

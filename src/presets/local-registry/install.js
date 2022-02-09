@@ -3,40 +3,31 @@ const { createReadStream } = require("fs");
 const { join: joinPath, parse: parsePath } = require("path");
 const { match: createMatch } = require("path-to-regexp");
 
-const { registryDirPath, config } = require("../../config");
 const { requestHttps } = require("../../request-https");
 const { joinChunks } = require("../../join-chunks");
 
-const { infoFile, proxies } = config;
-
-async function guard(req) {
-  return req.method === "GET";
-}
-
-async function handler(req, res) {
-  try {
-    await takeLocal(req, res);
-  } catch {
-    try {
-      await takePublic(req, res);
-    } catch {
-      res.statusCode = 400;
-      res.end();
-    }
+async function handler(options, req, res) {
+  if (!(await takeLocal(options, req, res))) {
+    await takePublic(options, req, res);
   }
 }
 
-async function takeLocal(req, res) {
+async function takeLocal({ registryDirPath, infoFile }, req, res) {
   const { ext, dir, base } = parsePath(decodeURIComponent(req.url || ""));
   const path = joinPath(registryDirPath, dir, base, ext ? "" : infoFile);
 
-  await access(path);
-  createReadStream(path).pipe(res);
+  try {
+    await access(path);
+    createReadStream(path).pipe(res);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
-async function takePublic(req, res) {
+async function takePublic(options, req, res) {
   const path = decodeURIComponent(req.url || "");
-  const { host } = await takeProxy(path);
+  const { host } = await takeProxy(options, path);
 
   const chunks = await requestHttps(host, { method: "GET", path });
   const data = await joinChunks(chunks);
@@ -45,7 +36,7 @@ async function takePublic(req, res) {
   res.end();
 }
 
-async function takeProxy(url) {
+async function takeProxy({ proxies }, url) {
   for (let index = 0; index < proxies.length; index += 1) {
     const { name, host } = proxies[index];
     const match = createMatch(name.replace("*", "(.*)"));
@@ -56,4 +47,4 @@ async function takeProxy(url) {
   }
 }
 
-module.exports = { guard, handler };
+module.exports = handler;
