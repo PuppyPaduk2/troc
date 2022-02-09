@@ -1,11 +1,23 @@
 {
   "name": "troc",
-  "version": "0.0.0",
+  "version": "0.0.3",
   "description": "",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",
-  "license": "ISC"
+  "license": "ISC",
+  "bin": {
+    "troc": "src/index.js"
+  },
+  "dependencies": {
+    "commander": "^9.0.0",
+    "cosmiconfig": "^7.0.1",
+    "glob": "^7.2.0",
+    "merge": "^2.1.1",
+    "ora": "^5.4.1",
+    "path-to-regexp": "^6.2.0",
+    "sum": "^1.0.0"
+  }
 }
