@@ -36,9 +36,9 @@ async function takePublic(options, req, res) {
   res.end();
 }
 
-async function takeProxy({ proxies }, url) {
-  for (let index = 0; index < proxies.length; index += 1) {
-    const { name, host } = proxies[index];
+async function takeProxy({ installProxies }, url) {
+  for (let index = 0; index < installProxies.length; index += 1) {
+    const { name, host } = installProxies[index];
     const match = createMatch(name.replace("*", "(.*)"));
 
     if (match(url)) {

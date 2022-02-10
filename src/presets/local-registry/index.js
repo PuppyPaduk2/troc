@@ -45,10 +45,11 @@ function buildOptions(options = {}) {
   const baseDir = options.baseDir || process.cwd();
   const registryDir = options.registryDir || resolvePath(baseDir, "./registry");
   const infoFile = "info.json";
-  const proxies = options.proxies || [
+  const installProxies = options.proxies || [
     { name: "*", host: "https://registry.npmjs.org" },
   ];
   const packages = options.packages || ["."];
+  const ignore = options.ignore || ["package.json"];
   const preId = options.preId || "local";
   const spinner = ora();
 
@@ -57,8 +58,9 @@ function buildOptions(options = {}) {
     baseDir,
     registryDir,
     infoFile,
-    proxies,
+    installProxies,
     packages,
+    ignore,
     preId,
     spinner,
   });
