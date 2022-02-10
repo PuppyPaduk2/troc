@@ -5,36 +5,38 @@ const { runPresets } = require("../config");
 const handlers = [
   {
     guard: (req) => req.url.startsWith("/npm"),
-    handler: (req, res) => runPresets("handleNpm", req, res),
+    handler: (req, res) => runPresets("handleNpmRequest", req, res),
   },
   {
     guard: (req) => req.url.startsWith("/-"),
-    handler: (req, res) => runPresets("handleApi", req, res),
+    handler: (req, res) => runPresets("handleApiRequest", req, res),
   },
   {
     guard: (req) => req.method === "GET",
-    handler: (req, res) => runPresets("handleInstall", req, res),
+    handler: (req, res) => runPresets("handleInstallRequest", req, res),
   },
   {
     guard: (req) => req.method === "PUT",
-    handler: (req, res) => runPresets("handlePublish", req, res),
+    handler: (req, res) => runPresets("handlePublishRequest", req, res),
   },
 ];
 
-async function start() {
-  const [{ port }] = await runPresets("initialStart");
+function start() {
+  return new Promise(async (resolve) => {
+    const [{ port }] = await runPresets("initialStart");
+    const server = createServer(async (req, res) => {
+      await runPresets("handlePreRequest", req, res);
 
-  return createServer(async (req, res) => {
-    await runPresets("beforeHandleRequest", req, res);
-
-    try {
-      await handleRequest(req, res);
-      await runPresets("afterHandleRequest", req, res);
-    } catch (error) {
-      await runPresets("handleError", error, { req, res });
-    }
-  }).listen(port, () => {
-    runPresets("listenServer");
+      try {
+        await handleRequest(req, res);
+        await runPresets("handlePostRequest", req, res);
+      } catch (error) {
+        await runPresets("handleErrorRequest", error, { req, res });
+      }
+    }).listen(port, async () => {
+      await runPresets("listenServer");
+      resolve(server);
+    });
   });
 }
 

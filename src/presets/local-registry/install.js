@@ -12,9 +12,9 @@ async function handler(options, req, res) {
   }
 }
 
-async function takeLocal({ registryDirPath, infoFile }, req, res) {
+async function takeLocal({ registryDir, infoFile }, req, res) {
   const { ext, dir, base } = parsePath(decodeURIComponent(req.url || ""));
-  const path = joinPath(registryDirPath, dir, base, ext ? "" : infoFile);
+  const path = joinPath(registryDir, dir, base, ext ? "" : infoFile);
 
   try {
     await access(path);

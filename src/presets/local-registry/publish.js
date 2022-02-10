@@ -27,9 +27,9 @@ async function takePackageVersion(info) {
 }
 
 async function writeInfo({ options, req, info }) {
-  const { registryDirPath, infoFile } = options;
+  const { registryDir, infoFile } = options;
   const url = decodeURIComponent(req.url);
-  const dirPath = joinPath(registryDirPath, url);
+  const dirPath = joinPath(registryDir, url);
   const filePath = joinPath(dirPath, infoFile);
   const nextInfo = await buildInfo({ filePath, info });
 
@@ -38,9 +38,9 @@ async function writeInfo({ options, req, info }) {
 }
 
 async function writeTarball({ options, version, info }) {
-  const { registryDirPath } = options;
+  const { registryDir } = options;
   const pathname = parsePath(new URL(version.dist.tarball).pathname);
-  const dirPath = joinPath(registryDirPath, pathname.dir);
+  const dirPath = joinPath(registryDir, pathname.dir);
   const filePath = joinPath(dirPath, pathname.base);
   const { data } = info._attachments[pathname.base];
 
