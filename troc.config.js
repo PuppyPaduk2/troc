@@ -9,6 +9,7 @@ module.exports = {
     localRegistry({
       // registryDir: path.resolve(process.cwd(), "./registry-custom"),
       registryDir: "./registry-custom",
+      // packages: ["packages"],
       // packages: ["./apps", "packages", "packages"],
     }),
   ],

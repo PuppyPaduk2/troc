@@ -11,13 +11,13 @@ program.version(packageJson.version);
 program.command("start").description("Start server of registry").action(start);
 
 program
-  .command("publish")
+  .command("publish [tag]")
   .alias("pub")
   .description("Publish packages to local registry")
   .action(publish);
 
 program
-  .command("install [tag] [tag2]")
+  .command("install [tag]")
   .alias("i")
   .description("Install packages from local registry")
   .action(install);
