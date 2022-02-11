@@ -1,27 +1,29 @@
 const { cosmiconfigSync } = require("cosmiconfig");
-const { resolve: resolvePath } = require("path");
+const { parse: parsePath } = require("path");
 
 const localRegistry = require("./presets/local-registry");
 
-const name = "troc";
-const configExplorer = cosmiconfigSync(name);
-const searching = configExplorer.search();
+const configExplorer = cosmiconfigSync("troc");
+const resultSearch = configExplorer.search();
+
+const fileConfig = resultSearch ? resultSearch.filepath : null;
+const rawConfig = resultSearch ? resultSearch.config : {};
+
 const config = {
-  port: 5000,
-  registryDir: "./registry",
-  infoFile: "info.json",
-  proxies: [{ name: "*", host: "https://registry.npmjs.org" }],
-  presets: [localRegistry()],
-  ...(searching ? searching.config : null),
+  presets: rawConfig.presets || [localRegistry()],
 };
 
-const registryDirPath = resolvePath(process.cwd(), config.registryDir);
+const presets = config.presets.map((attachPreset) => {
+  return attachPreset({
+    dir: fileConfig ? parsePath(fileConfig).dir : null,
+  });
+});
 
 const runPresets = async (...args) => {
   const results = [];
 
-  for (let index = 0; index < config.presets.length; index += 1) {
-    const preset = config.presets[index];
+  for (let index = 0; index < presets.length; index += 1) {
+    const preset = presets[index];
     const result = await preset.apply(null, args);
 
     results.push(result);
@@ -30,4 +32,4 @@ const runPresets = async (...args) => {
   return results;
 };
 
-module.exports = { config, registryDirPath, runPresets };
+module.exports = { config, runPresets };

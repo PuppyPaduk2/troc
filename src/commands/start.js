@@ -30,6 +30,7 @@ function start() {
       try {
         await handleRequest(req, res);
         await runPresets("handlePostRequest", req, res);
+        await handlerCommandEnd(req, res);
       } catch (error) {
         await runPresets("handleErrorRequest", error, { req, res });
       }
@@ -50,6 +51,27 @@ async function handleRequest(req, res) {
   }
 
   await runPresets("handleBadRequest", req, res);
+}
+
+async function handlerCommandEnd(req, res) {
+  const commandType = takeCommandType(req);
+
+  await runPresets("handleCommandEnd", { req, res, commandType });
+}
+
+function takeCommandType(req) {
+  const referer = req.headers["referer"] || "";
+  const isAudit = req.url === "/-/npm/v1/security/audits/quick";
+
+  if (isAudit && referer.startsWith("install")) {
+    return "install";
+  } else if (isAudit && referer.startsWith("uninstall")) {
+    return "uninstall";
+  } else if (referer.startsWith("view")) {
+    return "view";
+  } else if (referer.startsWith("publish")) {
+    return "publish";
+  }
 }
 
 module.exports = { start };

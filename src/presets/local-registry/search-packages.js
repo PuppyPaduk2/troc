@@ -2,15 +2,15 @@ const { resolve: resolvePath } = require("path");
 
 const { globPromise } = require("../../glob-promise");
 
-async function handler({ baseDir, packages, ignore }) {
+async function handler(options = {}) {
+  const { baseDir, packages, ignore: ignorePaths } = options;
   const promises = packages.map((value) => {
-    return globPromise("**/package.json", {
-      cwd: resolvePath(baseDir, value),
-      ignore: ["**/node_modules/**", ...ignore],
-    });
+    const cwd = resolvePath(baseDir, value);
+    const ignore = ["**/node_modules/**", ...ignorePaths];
+    return globPromise("**/package.json", { cwd, ignore });
   });
   const results = (await Promise.all(promises)).map((paths, index) => {
-    return paths.map((path) => resolvePath(packages[index], path));
+    return paths.map((path) => resolvePath(baseDir, packages[index], path));
   });
   const uniq = Array.from(new Set(results.flat()));
 
