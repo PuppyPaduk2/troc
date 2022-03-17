@@ -4,14 +4,18 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "webpack",
+    "start": "webpack --watch"
   },
   "author": "",
   "license": "ISC",
   "bin": {
     "troc": "src/index.js"
   },
-  "dependencies": {},
+  "dependencies": {
+    "nodemon-webpack-plugin": "^4.7.1"
+  },
   "devDependencies": {
     "@babel/core": "^7.17.7",
     "@babel/plugin-proposal-class-properties": "^7.16.7",
@@ -24,6 +28,7 @@
     "@typescript-eslint/eslint-plugin": "^5.15.0",
     "@typescript-eslint/parser": "^5.15.0",
     "babel-loader": "^8.2.3",
+    "commander": "^9.0.0",
     "eslint": "^8.11.0",
     "eslint-config-prettier": "^8.5.0",
     "eslint-plugin-prettier": "^4.0.0",
