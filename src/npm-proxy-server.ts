@@ -35,19 +35,25 @@ export async function createServer({
     const server = createHttpServer(async (req, res) => {
       const body: Buffer[] = [];
 
-      req.on("data", (chunk: Buffer) => body.push(chunk));
+      req.on("data", (chunk: Buffer) => {
+        body.push(chunk);
+      });
       req.on("end", () => {
         for (const url of correctProxy) {
           console.log(url);
 
           const params = buildRequestOptions({ url, req });
           const request = requests[toRequestProtocol(params.protocol)];
+          const reqProxy = request(params);
 
-          const reqProxy = request(params, (resProxy) => {
-            resProxy.statusCode === 200 && resProxy.pipe(res);
+          body.forEach((chunk) => {
+            reqProxy.write(chunk);
           });
-
-          body.forEach((chunk) => reqProxy.write(chunk));
+          reqProxy.on("response", (resProxy) => {
+            if (resProxy.statusCode === 200) {
+              resProxy.pipe(res);
+            }
+          });
           reqProxy.on("error", (error) => {
             console.log(error);
           });
