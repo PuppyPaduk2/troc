@@ -38,7 +38,7 @@ module.exports = () => ({
   plugins: [
     new NodemonPlugin({
       script: "./dist/run.js",
-      watch: path.resolve("./dist"),
+      watch: path.resolve("./dist/run.js"),
       delay: "200",
     }),
   ],

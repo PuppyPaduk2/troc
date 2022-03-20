@@ -1,10 +1,10 @@
 import { program } from "commander";
 
 import { version } from "../package.json";
-import { createServer } from "./npm-proxy-server";
+import { createNpmProxyServer } from "./npm-proxy-server";
 
 program.command("run-proxy").action(async () => {
-  await createServer({ port: 4000, proxy: [] });
+  await createNpmProxyServer({ port: 4000, proxy: [] });
   console.log(`Server created http://localhost:4000`);
 });
 
