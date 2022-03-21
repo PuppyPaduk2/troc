@@ -10,8 +10,11 @@ import {
 import { request as httpsRequest } from "https";
 import * as path from "path";
 import * as fs from "fs/promises";
+import { recursive as mergeRecursive } from "merge";
 
-const storageProxyDir = path.resolve(__dirname, "./storage/proxy");
+const storageDir = path.resolve(__dirname, "./storage");
+const storageProxyDir = path.resolve(storageDir, "./proxy");
+const storagePublishDir = path.resolve(storageDir, "./publish");
 const infoName = "info.json";
 
 type Info = {
@@ -23,6 +26,7 @@ type CommandHandlerParams = {
   req: IncomingMessage;
   res: ServerResponse;
   reqData: Buffer[];
+  reqUrl: string;
 };
 
 type CommandHandlerResult = Error | null;
@@ -32,6 +36,7 @@ const commandHandlers: Record<
   (params: CommandHandlerParams) => Promise<CommandHandlerResult>
 > = {
   install: installHandler,
+  publish: publishHandler,
 };
 
 export async function createServer(params: {
@@ -71,7 +76,15 @@ export async function createServer(params: {
         return send403();
       }
 
-      const resultHandler = await handler({ proxy, req, res, reqData });
+      const reqUrl: string = decodeURIComponent(req.url ?? "");
+
+      console.log(
+        bgBlack.cyan(req.method ?? ""),
+        bgCyan.black(getSession(req) ?? ""),
+        reqUrl
+      );
+
+      const resultHandler = await handler({ proxy, req, res, reqData, reqUrl });
 
       if (resultHandler instanceof Error) {
         return send403();
@@ -157,9 +170,9 @@ function getRequestParams(url: string, req?: IncomingMessage): RequestOptions {
   };
 }
 
-export function removeProps<Value extends Record<string, unknown>>(
+export function removeProps<Value extends object>(
   value: Value,
-  ...keys: string[]
+  ...keys: (keyof Value)[]
 ): Value {
   const result = Object.assign({}, value);
 
@@ -199,20 +212,13 @@ function getCommand(req: IncomingMessage): string | null {
 async function installHandler({
   req,
   reqData,
+  reqUrl,
   res,
   proxy,
 }: CommandHandlerParams): Promise<CommandHandlerResult> {
-  const reqUrl: string = decodeURIComponent(req.url ?? "");
-
   if (!reqUrl) {
     return new Error("Incorrect url");
   }
-
-  console.log(
-    bgBlack.cyan(req.method ?? ""),
-    bgCyan.black(getSession(req) ?? ""),
-    reqUrl
-  );
 
   // audit
   if (req.url?.startsWith("/-")) {
@@ -225,8 +231,9 @@ async function installHandler({
 
   // Send tarball if one exist in storage
   if (parsedUrl.ext) {
-    const dir = path.join(storageProxyDir, parsedUrl.dir);
-    const file = path.resolve(dir, parsedUrl.base);
+    // Check published package in storage
+    let dir = path.join(storagePublishDir, parsedUrl.dir);
+    let file = path.resolve(dir, parsedUrl.base);
 
     if (await access(file)) {
       const data = await fs.readFile(file);
@@ -235,6 +242,29 @@ async function installHandler({
       res.end();
       return null;
     }
+
+    dir = path.join(storageProxyDir, parsedUrl.dir);
+    file = path.resolve(dir, parsedUrl.base);
+
+    if (await access(file)) {
+      const data = await fs.readFile(file);
+
+      res.write(data);
+      res.end();
+      return null;
+    }
+  }
+
+  // Check published package in storage
+  const dir = path.join(storagePublishDir, parsedUrl.dir, parsedUrl.base);
+  const file = path.resolve(dir, infoName);
+
+  if (await access(file)) {
+    const data = await fs.readFile(file);
+
+    res.write(data);
+    res.end();
+    return null;
   }
 
   // Proxy to services
@@ -344,5 +374,53 @@ async function access(file: string): Promise<boolean> {
     return true;
   } catch {
     return false;
+  }
+}
+
+async function publishHandler({
+  reqData,
+  reqUrl,
+  res,
+}: CommandHandlerParams): Promise<CommandHandlerResult> {
+  const reqInfo: { _attachments: Record<string, { data: string }> } =
+    JSON.parse(Buffer.concat(reqData).toString());
+  const dir = path.join(storagePublishDir, reqUrl);
+  const tarballDir = path.join(dir, "-");
+
+  await fs.mkdir(tarballDir, { recursive: true });
+
+  const attachments = Object.entries<{ data: string }>(reqInfo._attachments);
+
+  for (const [fileName, { data }] of attachments) {
+    const file = path.join(tarballDir, fileName);
+    const isAccess = await access(file);
+
+    if (isAccess) {
+      res.statusCode = 400;
+      res.end("Version of package exist already");
+
+      return null;
+    }
+
+    await fs.writeFile(file, data, "base64");
+  }
+
+  const file = path.join(dir, infoName);
+  let info = (await readJson(file)) || {};
+
+  info = mergeRecursive(info, removeProps(reqInfo, "_attachments"));
+
+  await fs.writeFile(file, JSON.stringify(info, null, 2));
+
+  res.end();
+
+  return null;
+}
+
+async function readJson(file: string): Promise<object | null> {
+  try {
+    return JSON.parse((await fs.readFile(file)).toString());
+  } catch {
+    return null;
   }
 }
