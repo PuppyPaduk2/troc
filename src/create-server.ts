@@ -1,4 +1,4 @@
-import { bgBlack, bgCyan } from "colors";
+import { bgBlack, bgCyan, cyan } from "colors";
 import {
   createServer as createHttpServer,
   Server,
@@ -37,6 +37,7 @@ const commandHandlers: Record<
 > = {
   install: installHandler,
   publish: publishHandler,
+  view: viewHandler,
 };
 
 export async function createServer(params: {
@@ -81,6 +82,7 @@ export async function createServer(params: {
       console.log(
         bgBlack.cyan(req.method ?? ""),
         bgCyan.black(getSession(req) ?? ""),
+        cyan.bold(command),
         reqUrl
       );
 
@@ -132,7 +134,7 @@ async function checkProxy(proxy: string[]): Promise<string[]> {
 async function checkService(url: string): Promise<Error | null> {
   return new Promise((resolve) => {
     const request = getRequest(url);
-    const req = request(getRequestParams(url));
+    const req = request(getRequestOptions(url));
     let error: Error | null = null;
 
     req.on("error", (_error) => {
@@ -157,7 +159,7 @@ function getRequest(url: string) {
   throw new Error("Incorrect request type");
 }
 
-function getRequestParams(url: string, req?: IncomingMessage): RequestOptions {
+function getRequestOptions(url: string, req?: IncomingMessage): RequestOptions {
   const parsedUrl = new URL(url);
 
   return {
@@ -222,7 +224,6 @@ async function installHandler({
 
   // audit
   if (req.url?.startsWith("/-")) {
-    res.write(Buffer.concat(reqData));
     res.end();
     return null;
   }
@@ -343,16 +344,19 @@ async function requestProxy({
   req,
   reqData,
   url,
+  onOptions = (options) => options,
 }: {
   req: IncomingMessage;
   reqData: Buffer[];
   url: string;
+  onOptions?: (options: RequestOptions) => RequestOptions;
 }): Promise<Buffer[] | null> {
   return await new Promise<Buffer[] | null>((resolve) => {
     const request = getRequest(url);
-    const reqProxy = request(getRequestParams(url, req));
+    const options = getRequestOptions(url, req);
+    const reqProxy = request(onOptions(options));
 
-    reqProxy.write(Buffer.concat(reqData));
+    reqProxy.write(Buffer.concat(reqData), "utf8");
 
     reqProxy.on("response", async (resProxy) => {
       if (resProxy.statusCode !== 200) {
@@ -365,6 +369,8 @@ async function requestProxy({
     reqProxy.on("error", () => {
       resolve(null);
     });
+
+    reqProxy.end();
   });
 }
 
@@ -423,4 +429,60 @@ async function readJson(file: string): Promise<object | null> {
   } catch {
     return null;
   }
+}
+
+async function viewHandler({
+  req,
+  reqUrl,
+  reqData,
+  res,
+  proxy,
+}: CommandHandlerParams): Promise<CommandHandlerResult> {
+  // Check published package
+  let dir = path.join(storagePublishDir, reqUrl);
+  let file = path.resolve(dir, infoName);
+
+  if (await access(file)) {
+    const data = await fs.readFile(file);
+
+    res.write(data);
+    res.end();
+    return null;
+  }
+
+  // Check proxy package
+  for (const url of proxy) {
+    const resultRequestProxy: Buffer[] | null = await requestProxy({
+      req,
+      reqData,
+      url,
+      onOptions: (options) => {
+        if (options.headers && "accept-encoding" in options.headers) {
+          delete options.headers;
+        }
+
+        return options;
+      },
+    });
+
+    if (Array.isArray(resultRequestProxy)) {
+      res.write(Buffer.concat(resultRequestProxy));
+      res.end();
+      return null;
+    }
+  }
+
+  // Check saved proxy package
+  dir = path.join(storageProxyDir, reqUrl);
+  file = path.resolve(dir, infoName);
+
+  if (await access(file)) {
+    const data = await fs.readFile(file);
+
+    res.write(data);
+    res.end();
+    return null;
+  }
+
+  return new Error("Command view didn't process");
 }
