@@ -4,7 +4,7 @@ import { version } from "../package.json";
 import { createServer } from "./create-server";
 
 program.command("run-proxy").action(async () => {
-  const result = await createServer({ port: 4000, proxy: [] });
+  const result = await createServer({ port: 4000 });
 
   if (result instanceof Error) {
     return;

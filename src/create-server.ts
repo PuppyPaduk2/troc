@@ -42,7 +42,7 @@ const commandHandlers: Record<
 
 export async function createServer(params: {
   port: number;
-  proxy: string[];
+  proxy?: string[];
   hostname?: string;
 }): Promise<Server | Error> {
   const resultCheckParams: Error | null = await checkParams(params);
@@ -50,7 +50,7 @@ export async function createServer(params: {
   if (resultCheckParams instanceof Error) return resultCheckParams;
 
   const { port, hostname } = params;
-  const proxy: string[] = await checkProxy(params.proxy);
+  const proxy: string[] = params.proxy ? await checkProxy(params.proxy) : [];
 
   return new Promise<Server | Error>((resolve) => {
     const server = createHttpServer(async (req, res) => {
@@ -102,12 +102,10 @@ export async function createServer(params: {
   });
 }
 
-async function checkParams({
-  proxy,
-}: {
-  proxy: string[];
+async function checkParams(params: {
+  proxy?: string[];
 }): Promise<Error | null> {
-  if (!Array.isArray(proxy)) {
+  if ("proxy" in params && !Array.isArray(params.proxy)) {
     return new Error("Proxy is incorrect type");
   }
 
