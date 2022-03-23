@@ -107,8 +107,8 @@ async function checkParams({
 }: {
   proxy: string[];
 }): Promise<Error | null> {
-  if (proxy && proxy.length === 0) {
-    return new Error("Proxy is empty");
+  if (!Array.isArray(proxy)) {
+    return new Error("Proxy is incorrect type");
   }
 
   return null;

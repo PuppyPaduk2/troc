@@ -6,7 +6,7 @@ const ShellPlugin = require("./utils/shell-plugin");
 
 const cwd = process.cwd();
 
-module.exports = () => ({
+module.exports = ({ server }) => ({
   mode: "development",
   target: "node",
   devtool: "source-map",
@@ -38,11 +38,12 @@ module.exports = () => ({
     aggregateTimeout: 100,
   },
   plugins: [
-    new NodemonPlugin({
-      script: "./dist/run.js",
-      watch: path.resolve("./dist/run.js"),
-      delay: "200",
-    }),
+    server &&
+      new NodemonPlugin({
+        script: "./dist/run.js",
+        watch: path.resolve("./dist/run.js"),
+        delay: "200",
+      }),
     new ShellPlugin("emit", "node ./scripts/after-build.js"),
-  ],
+  ].filter(Boolean),
 });
