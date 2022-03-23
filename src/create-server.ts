@@ -16,9 +16,16 @@ const storageDir = path.resolve(__dirname, "./storage");
 const storageProxyDir = path.resolve(storageDir, "./proxy");
 const storagePublishDir = path.resolve(storageDir, "./publish");
 const infoName = "info.json";
+const defHostname = "0.0.0.0";
 
 type Info = {
   versions: Record<string, { dist: { shasum: string; tarball: string } }>;
+};
+
+type ServerParams = {
+  port: number;
+  proxy?: string[];
+  hostname?: string;
 };
 
 type CommandHandlerParams = {
@@ -40,16 +47,14 @@ const commandHandlers: Record<
   view: viewHandler,
 };
 
-export async function createServer(params: {
-  port: number;
-  proxy?: string[];
-  hostname?: string;
-}): Promise<Server | Error> {
+export async function createServer(
+  params: ServerParams
+): Promise<Server | Error> {
   const resultCheckParams: Error | null = await checkParams(params);
 
   if (resultCheckParams instanceof Error) return resultCheckParams;
 
-  const { port, hostname } = params;
+  const { port, hostname = defHostname } = params;
   const proxy: string[] = params.proxy ? await checkProxy(params.proxy) : [];
 
   return new Promise<Server | Error>((resolve) => {
@@ -102,9 +107,11 @@ export async function createServer(params: {
   });
 }
 
-async function checkParams(params: {
-  proxy?: string[];
-}): Promise<Error | null> {
+async function checkParams(params: ServerParams): Promise<Error | null> {
+  if (!("port" in params)) {
+    return new Error("Port is empty");
+  }
+
   if ("proxy" in params && !Array.isArray(params.proxy)) {
     return new Error("Proxy is incorrect type");
   }
