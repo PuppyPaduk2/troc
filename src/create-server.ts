@@ -12,25 +12,28 @@ import * as path from "path";
 import * as fs from "fs/promises";
 import { recursive as mergeRecursive } from "merge";
 
-const storageDir = path.resolve(__dirname, "./storage");
-const storageProxyDir = path.resolve(storageDir, "./proxy");
-const storagePublishDir = path.resolve(storageDir, "./publish");
-const infoName = "info.json";
-const defHostname = "0.0.0.0";
+const defProxyDirName = "proxy";
+const defPublishDirName = "publish";
+const defInfoName = "info.json";
+// const defHostname = "0.0.0.0";
+const defStorageDir = path.resolve(__dirname, "./storage");
 
 type Info = {
   versions: Record<string, { dist: { shasum: string; tarball: string } }>;
 };
 
 export type ServerOptions = {
-  port: number;
-  hostname?: string;
-  protocol?: string;
+  // port: number;
+  // hostname?: string;
+  // protocol?: string;
   proxy?: string[];
+  storageDir?: string;
 };
 
 type CommandHandlerParams = {
   proxy: string[];
+  storageProxyDir: string;
+  storagePublishDir: string;
   req: IncomingMessage;
   res: ServerResponse;
   reqData: Buffer[];
@@ -48,76 +51,129 @@ const commandHandlers: Record<
   view: viewHandler,
 };
 
-export async function createServer(
-  params: ServerOptions
-): Promise<Server | Error> {
-  const resultCheckParams: Error | null = await checkParams(params);
-
-  if (resultCheckParams instanceof Error) return resultCheckParams;
-
-  const { port, hostname = defHostname } = params;
-  const proxy: string[] = params.proxy ? await checkProxy(params.proxy) : [];
-
-  return new Promise<Server | Error>((resolve) => {
-    const server = createHttpServer(async (req, res) => {
-      const send403 = () => {
-        res.statusCode = 403;
-        res.end("Forbidden");
-      };
-
-      const reqData = await getIncomingMessageData(req);
-
-      if (!reqData) {
-        return send403();
-      }
-
-      const command = getCommand(req);
-
-      if (!command) {
-        return send403();
-      }
-
-      const handler = commandHandlers[command];
-
-      if (!handler) {
-        return send403();
-      }
-
-      const reqUrl: string = decodeURIComponent(req.url ?? "");
-
-      console.log(
-        bgBlack.cyan(req.method ?? ""),
-        bgCyan.black(getSession(req) ?? ""),
-        cyan.bold(command),
-        reqUrl
-      );
-
-      const resultHandler = await handler({ proxy, req, res, reqData, reqUrl });
-
-      if (resultHandler instanceof Error) {
-        return send403();
-      }
-    });
-
-    server.once("error", (error) => {
-      resolve(error);
-    });
-    server.listen(port, hostname, () => {
-      resolve(server);
-    });
-  });
-}
-
-async function checkParams(params: ServerOptions): Promise<Error | null> {
-  if (!("port" in params)) {
-    return new Error("Port is empty");
-  }
-
+export async function createServer(params: ServerOptions): Promise<Server> {
   if ("proxy" in params && !Array.isArray(params.proxy)) {
-    return new Error("Proxy is incorrect type");
+    throw new Error("Proxy isn't array");
   }
 
-  return null;
+  // const { storageDir = defStorageDir, port, hostname = defHostname } = params;
+  const { storageDir = defStorageDir } = params;
+  const proxy: string[] = params.proxy ? await checkProxy(params.proxy) : [];
+  const storageProxyDir = path.join(storageDir, defProxyDirName);
+  const storagePublishDir = path.join(storageDir, defPublishDirName);
+
+  const server = createHttpServer(async (req, res) => {
+    const send403 = () => {
+      res.statusCode = 403;
+      res.end("Forbidden");
+    };
+
+    const reqData = await getIncomingMessageData(req);
+
+    if (!reqData) {
+      return send403();
+    }
+
+    const command = getCommand(req);
+
+    if (!command) {
+      return send403();
+    }
+
+    const handler = commandHandlers[command];
+
+    if (!handler) {
+      return send403();
+    }
+
+    const reqUrl: string = decodeURIComponent(req.url ?? "");
+
+    console.log(
+      bgBlack.cyan(req.method ?? ""),
+      bgCyan.black(getSession(req) ?? ""),
+      cyan.bold(command),
+      reqUrl
+    );
+
+    const resultHandler = await handler({
+      proxy,
+      storageProxyDir,
+      storagePublishDir,
+      req,
+      res,
+      reqData,
+      reqUrl,
+    });
+
+    if (resultHandler instanceof Error) {
+      return send403();
+    }
+  });
+
+  server.on("listening", () => {
+    console.log("Proxy:", proxy);
+    console.log("StorageDir:", storageDir);
+  });
+
+  return server;
+
+  // return new Promise<Server | Error>((resolve) => {
+  //   const server = createHttpServer(async (req, res) => {
+  //     const send403 = () => {
+  //       res.statusCode = 403;
+  //       res.end("Forbidden");
+  //     };
+
+  //     const reqData = await getIncomingMessageData(req);
+
+  //     if (!reqData) {
+  //       return send403();
+  //     }
+
+  //     const command = getCommand(req);
+
+  //     if (!command) {
+  //       return send403();
+  //     }
+
+  //     const handler = commandHandlers[command];
+
+  //     if (!handler) {
+  //       return send403();
+  //     }
+
+  //     const reqUrl: string = decodeURIComponent(req.url ?? "");
+
+  //     console.log(
+  //       bgBlack.cyan(req.method ?? ""),
+  //       bgCyan.black(getSession(req) ?? ""),
+  //       cyan.bold(command),
+  //       reqUrl
+  //     );
+
+  //     const resultHandler = await handler({
+  //       proxy,
+  //       storageProxyDir,
+  //       storagePublishDir,
+  //       req,
+  //       res,
+  //       reqData,
+  //       reqUrl,
+  //     });
+
+  //     if (resultHandler instanceof Error) {
+  //       return send403();
+  //     }
+  //   });
+
+  //   server.once("error", (error) => {
+  //     resolve(error);
+  //   });
+
+  //   server.listen(port, hostname, () => {
+  //     resolve(server);
+  //   });
+  // });
 }
 
 async function checkProxy(proxy: string[]): Promise<string[]> {
@@ -223,6 +279,8 @@ async function installHandler({
   reqUrl,
   res,
   proxy,
+  storagePublishDir,
+  storageProxyDir,
 }: CommandHandlerParams): Promise<CommandHandlerResult> {
   if (!reqUrl) {
     return new Error("Incorrect url");
@@ -264,7 +322,7 @@ async function installHandler({
 
   // Check published package in storage
   const dir = path.join(storagePublishDir, parsedUrl.dir, parsedUrl.base);
-  const file = path.resolve(dir, infoName);
+  const file = path.resolve(dir, defInfoName);
 
   if (await access(file)) {
     const data = await fs.readFile(file);
@@ -311,7 +369,7 @@ async function installHandler({
 
       const infoStr = JSON.stringify(info, null, 2);
       const dir = path.join(storageProxyDir, parsedUrl.dir, parsedUrl.base);
-      const file = path.resolve(dir, infoName);
+      const file = path.resolve(dir, defInfoName);
 
       await fs.mkdir(dir, { recursive: true });
       await fs.writeFile(file, infoStr);
@@ -325,7 +383,7 @@ async function installHandler({
   // Check info.json in storage
   if (!parsedUrl.ext) {
     const dir = path.join(storageProxyDir, parsedUrl.dir, parsedUrl.base);
-    const file = path.resolve(dir, infoName);
+    const file = path.resolve(dir, defInfoName);
 
     if (await access(file)) {
       const data = await fs.readFile(file);
@@ -393,6 +451,7 @@ async function publishHandler({
   reqData,
   reqUrl,
   res,
+  storagePublishDir,
 }: CommandHandlerParams): Promise<CommandHandlerResult> {
   const reqInfo: { _attachments: Record<string, { data: string }> } =
     JSON.parse(Buffer.concat(reqData).toString());
@@ -417,7 +476,7 @@ async function publishHandler({
     await fs.writeFile(file, data, "base64");
   }
 
-  const file = path.join(dir, infoName);
+  const file = path.join(dir, defInfoName);
   let info = (await readJson(file)) || {};
 
   info = mergeRecursive(info, removeProps(reqInfo, "_attachments"));
@@ -443,10 +502,12 @@ async function viewHandler({
   reqData,
   res,
   proxy,
+  storagePublishDir,
+  storageProxyDir,
 }: CommandHandlerParams): Promise<CommandHandlerResult> {
   // Check published package
   let dir = path.join(storagePublishDir, reqUrl);
-  let file = path.resolve(dir, infoName);
+  let file = path.resolve(dir, defInfoName);
 
   if (await access(file)) {
     const data = await fs.readFile(file);
@@ -480,7 +541,7 @@ async function viewHandler({
 
   // Check saved proxy package
   dir = path.join(storageProxyDir, reqUrl);
-  file = path.resolve(dir, infoName);
+  file = path.resolve(dir, defInfoName);
 
   if (await access(file)) {
     const data = await fs.readFile(file);

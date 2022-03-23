@@ -13,7 +13,18 @@ const defHostname = "0.0.0.0";
 const defProtocol = "http:";
 const npmrcName = ".npmrc";
 const npmrcCopyName = ".npmrc-copy";
+const defStorageDir = resolve(__dirname, "./storage");
 
+type CommonOptions = {
+  port?: string;
+  hostname?: string;
+  protocol?: string;
+  proxy?: string[];
+  proxyNpm?: boolean;
+  storageDir?: string;
+};
+
+// TODO test default value of options of command
 program
   .command("run")
   .option("--port <port>", "Port of server")
@@ -21,8 +32,18 @@ program
   .option("--protocol <protocol>", "Protocol of server")
   .option("--proxy <proxy...>", "Proxy of services")
   .option("--no-proxy-npm")
-  .action(async (options: RunServerOptions) => {
-    await runServer(options);
+  .option("--storage-dir <storageDir>", "Directory of storage")
+  .action(async (options: CommonOptions) => {
+    const protocol = options.protocol ?? defProtocol;
+    const hostname = options.hostname ?? defHostname;
+    const port = await getPort(options.port ? +options.port : defPort);
+
+    const server = await createServer({
+      proxy: getProxy(options),
+      storageDir: getStorageDir(options),
+    });
+
+    await runServer(server, port, hostname, protocol);
   });
 
 program
@@ -38,6 +59,7 @@ program
   .option("--protocol <protocol>", "Protocol of server")
   .option("--proxy <proxy...>", "Proxy of services")
   .option("--no-proxy-npm")
+  .option("--storage-dir <storageDir>", "Directory of storage")
   .action(async (pkg, options) => {
     const args1 = [
       options.saveProd && "--save-prod",
@@ -51,27 +73,33 @@ program
     const npmrcFile = resolve(process.cwd(), npmrcName);
     const npmrcCopyFile = resolve(process.cwd(), npmrcCopyName);
     const isNpmrc = await access(npmrcFile);
-    const serverOptions: ServerOptions = await getServerOptions({
-      port: options.port,
-      hostname: options.hostname,
-      protocol: options.protocol,
-      proxy: options.proxy,
-      proxyNpm: options.proxyNpm,
-    });
 
     if (isNpmrc) {
       await copyFile(npmrcFile, npmrcCopyFile);
     }
 
-    await writeFile(
-      npmrcFile,
-      `registry=${serverOptions.protocol}//${serverOptions.hostname}:${serverOptions.port}\n`
-    );
+    const protocol = options.protocol ?? defProtocol;
+    const hostname = options.hostname ?? defHostname;
+    const port = await getPort(options.port ? +options.port : defPort);
 
-    const server = await runServer(serverOptions);
+    await writeFile(npmrcFile, `registry=${protocol}//${hostname}:${port}\n`);
+
+    const revertNpmrc = async () => {
+      await rm(npmrcFile);
+
+      if (isNpmrc) {
+        await copyFile(npmrcCopyFile, npmrcFile);
+        await rm(npmrcCopyFile);
+      }
+    };
+
+    const server = await createServer({
+      proxy: getProxy(options),
+      storageDir: getStorageDir(options),
+    }).then((server) => runServer(server, port, hostname, protocol));
 
     if (server instanceof Error) {
-      return;
+      return revertNpmrc();
     }
 
     const code = await new Promise<number | null>((resolved) => {
@@ -88,65 +116,13 @@ program
     });
 
     server.close();
-
-    await rm(npmrcFile);
-
-    if (isNpmrc) {
-      await copyFile(npmrcCopyFile, npmrcFile);
-      await rm(npmrcCopyFile);
-    }
-
+    await revertNpmrc();
     process.exit(code ?? undefined);
   });
 
 program.version(version).parse(process.argv);
 
-type RunServerOptions = {
-  port?: number;
-  hostname?: string;
-  protocol?: string;
-  proxy?: string[];
-  proxyNpm?: boolean;
-};
-
-async function runServer({
-  port = defPort,
-  hostname = defHostname,
-  protocol = defProtocol,
-  proxy = [],
-  proxyNpm = true,
-}: RunServerOptions): Promise<Server | Error> {
-  const server = await createServer({
-    port,
-    hostname,
-    proxy: [...proxy, proxyNpm ? npmUrl : ""].filter(Boolean),
-  });
-
-  if (server instanceof Error) {
-    console.log("Starting server error");
-    return server;
-  }
-
-  console.log(`Listen ${protocol}//${hostname}:${port}`);
-  return server;
-}
-
-async function getServerOptions({
-  port = defPort,
-  hostname = defHostname,
-  protocol = defProtocol,
-  proxy = [],
-  proxyNpm = true,
-}: RunServerOptions): Promise<ServerOptions> {
-  return {
-    port: await getPort(port),
-    hostname,
-    protocol,
-    proxy: [...proxy, proxyNpm ? npmUrl : ""].filter(Boolean),
-  };
-}
-
-async function getPort(startPort: number): Promise<number> {
+async function getPort(startPort: number = defPort): Promise<number> {
   for (let port = startPort; port < 65535; port += 1) {
     if (await checkPort(port)) {
       return port;
@@ -156,7 +132,7 @@ async function getPort(startPort: number): Promise<number> {
   throw new Error("Incorrect port");
 }
 
-function checkPort(port: number, hostname = "0.0.0.0"): Promise<boolean> {
+function checkPort(port: number, hostname = defHostname): Promise<boolean> {
   return new Promise<boolean>((resolve) => {
     const server = new Server();
 
@@ -180,4 +156,37 @@ async function access(file: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+function getProxy(params: { proxy?: string[]; proxyNpm?: boolean }): string[] {
+  return [...(params.proxy ?? []), params.proxyNpm ? npmUrl : ""].filter(
+    Boolean
+  );
+}
+
+function getStorageDir(params: { storageDir?: string }): string {
+  return resolve(process.cwd(), params.storageDir ?? defStorageDir);
+}
+
+async function runServer(
+  server: Server,
+  port: number,
+  hostname?: string,
+  protocol?: string
+): Promise<Server | Error> {
+  return new Promise<Server | Error>((resolve) => {
+    server.on("listening", () => {
+      console.log(`Listen ${protocol}//${hostname}:${port}`);
+      resolve(server);
+    });
+
+    server.on("error", () => {
+      const message = "Starting server error";
+
+      console.log(message);
+      resolve(new Error(message));
+    });
+
+    server.listen(port, hostname);
+  });
 }
