@@ -11,7 +11,7 @@
   "author": "",
   "license": "ISC",
   "bin": {
-    "troc": "src/index.js"
+    "troc": "dist/cli.js"
   },
   "devDependencies": {
     "@babel/core": "^7.17.7",
