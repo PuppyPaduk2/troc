@@ -22,10 +22,11 @@ type Info = {
   versions: Record<string, { dist: { shasum: string; tarball: string } }>;
 };
 
-type ServerParams = {
+export type ServerOptions = {
   port: number;
-  proxy?: string[];
   hostname?: string;
+  protocol?: string;
+  proxy?: string[];
 };
 
 type CommandHandlerParams = {
@@ -48,7 +49,7 @@ const commandHandlers: Record<
 };
 
 export async function createServer(
-  params: ServerParams
+  params: ServerOptions
 ): Promise<Server | Error> {
   const resultCheckParams: Error | null = await checkParams(params);
 
@@ -107,7 +108,7 @@ export async function createServer(
   });
 }
 
-async function checkParams(params: ServerParams): Promise<Error | null> {
+async function checkParams(params: ServerOptions): Promise<Error | null> {
   if (!("port" in params)) {
     return new Error("Port is empty");
   }

@@ -14,7 +14,11 @@ function chmodXFile(file) {
 async function addBinNode(file) {
   return readFile(file)
     .then((data) => data.toString())
-    .then((data) => writeFile(file, `#!/usr/bin/env node\n${data}`));
+    .then((data) => {
+      if (!data.match(/^#!\/usr/)) {
+        writeFile(file, `#!/usr/bin/env node\n${data}`);
+      }
+    });
 }
 
 const file = resolve(__dirname, "../dist/cli.js");
