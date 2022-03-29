@@ -4,8 +4,8 @@ import { spawn } from "child_process";
 import { copyFile, access as fsAccess, writeFile, rm } from "fs/promises";
 import { resolve } from "path";
 
-import { version } from "../package.json";
-import { createServer, ServerOptions } from "./create-server";
+import { version } from "../../package.json";
+import { createServer } from "../create-server";
 
 const npmUrl = "https://registry.npmjs.org";
 const defPort = 4000;
@@ -27,6 +27,7 @@ type CommonOptions = {
 // TODO test default value of options of command
 program
   .command("run")
+  .command("server")
   .option("--port <port>", "Port of server")
   .option("--hostname <hostname>", "Hostname of server")
   .option("--protocol <protocol>", "Protocol of server")
@@ -39,7 +40,7 @@ program
     const port = await getPort(options.port ? +options.port : defPort);
 
     const server = await createServer({
-      proxy: getProxy(options),
+      proxyAllUrls: getProxyAllUrls(options),
       storageDir: getStorageDir(options),
     });
 
@@ -94,7 +95,7 @@ program
     };
 
     const server = await createServer({
-      proxy: getProxy(options),
+      proxyAllUrls: getProxyAllUrls(options),
       storageDir: getStorageDir(options),
     }).then((server) => runServer(server, port, hostname, protocol));
 
@@ -158,7 +159,10 @@ async function access(file: string): Promise<boolean> {
   }
 }
 
-function getProxy(params: { proxy?: string[]; proxyNpm?: boolean }): string[] {
+function getProxyAllUrls(params: {
+  proxy?: string[];
+  proxyNpm?: boolean;
+}): string[] {
   return [...(params.proxy ?? []), params.proxyNpm ? npmUrl : ""].filter(
     Boolean
   );
