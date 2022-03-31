@@ -6,8 +6,7 @@ import {
 } from "http";
 import { request as httpsRequest } from "https";
 import * as path from "path";
-
-import { removeProps } from "../create-server";
+import { removeProps } from "./object";
 
 export async function getIncomingMessageData(
   req: IncomingMessage
@@ -29,13 +28,14 @@ export async function getIncomingMessageData(
   });
 }
 
+export type RequestOptionsFormatter = (
+  options: RequestOptions
+) => RequestOptions;
+
 export function proxyRequest(req: IncomingMessage, targetUrl: string) {
   const request = getRequest(targetUrl);
 
-  return (
-    formatter: (options: RequestOptions) => RequestOptions = (options) =>
-      options
-  ) => {
+  return (formatter: RequestOptionsFormatter = (options) => options) => {
     const options = formatter(getRequestOptions(targetUrl, req));
 
     return (data?: Buffer) => {
@@ -80,7 +80,7 @@ function getRequestOptions(url: string, req?: IncomingMessage): RequestOptions {
   return {
     protocol: parsedUrl.protocol,
     hostname: parsedUrl.hostname,
-    port: parsedUrl.port,
+    port: parsedUrl.port || undefined,
     method: req?.method ?? "GET",
     headers: req?.headers ? removeProps(req.headers, "host") : undefined,
     path: path.join(parsedUrl.pathname, req?.url ?? ""),

@@ -1,22 +1,30 @@
 import { IncomingMessage, ServerResponse } from "http";
 import * as path from "path";
 
-import { getIncomingMessageData } from "../utils/request";
+import {
+  getIncomingMessageData,
+  proxyRequest,
+  RequestOptionsFormatter,
+} from "../utils/request";
 import { Config } from "./config";
+import { Tokens } from "./tokens";
 
 export class Meta {
   public req: IncomingMessage;
   public res: ServerResponse;
   public serverConfig: Config = new Config();
+  public tokens: Tokens;
 
   constructor(params: {
     req: IncomingMessage;
     res: ServerResponse;
     serverConfig?: Config;
+    tokens?: Tokens;
   }) {
     this.req = params.req;
     this.res = params.res;
     this.serverConfig = params.serverConfig ?? this.serverConfig;
+    this.tokens = params.tokens ?? new Tokens({ config: this.serverConfig });
   }
 
   public get url() {
@@ -45,6 +53,22 @@ export class Meta {
     return this.req.headers.host ?? "";
   }
 
+  public get authorization() {
+    return this.req.headers.authorization ?? "";
+  }
+
+  public get auth() {
+    return this.authorization;
+  }
+
+  public get tokenPrefix() {
+    return this.auth.split(" ")[0] ?? "";
+  }
+
+  public get token() {
+    return this.auth.split(" ")[1] ?? "";
+  }
+
   public get parsedUrl() {
     return path.parse(this.url);
   }
@@ -57,63 +81,29 @@ export class Meta {
     return this.serverConfig.storageDir;
   }
 
-  public get tarballProxyDir() {
+  public get tarballDir() {
     return path.join(
       this.storageDir,
-      this.serverConfig.proxyFolder,
+      this.serverConfig.registryFolder,
       this.parsedUrl.dir
     );
   }
 
-  public get tarballProxyFile() {
-    return path.join(this.tarballProxyDir, this.parsedUrl.base);
+  public get tarballFile() {
+    return path.join(this.tarballDir, this.parsedUrl.base);
   }
 
-  public get infoProxyDir() {
+  public get infoDir() {
     return path.join(
       this.storageDir,
-      this.serverConfig.proxyFolder,
+      this.serverConfig.registryFolder,
       this.parsedUrl.dir,
       this.parsedUrl.base
     );
   }
 
-  public get infoProxyFile() {
-    return path.join(this.infoProxyDir, this.serverConfig.packageInfoName);
-  }
-
-  public get tarballPackageDir() {
-    if (this.command === "publish") {
-      return path.join(
-        this.storageDir,
-        this.serverConfig.packagesFolder,
-        this.url,
-        "-"
-      );
-    }
-
-    return path.join(
-      this.storageDir,
-      this.serverConfig.packagesFolder,
-      this.parsedUrl.dir
-    );
-  }
-
-  public get tarballPackageFile() {
-    return path.join(this.tarballPackageDir, this.parsedUrl.base);
-  }
-
-  public get infoPackageDir() {
-    return path.join(
-      this.storageDir,
-      this.serverConfig.packagesFolder,
-      this.parsedUrl.dir,
-      this.parsedUrl.base
-    );
-  }
-
-  public get infoPackageFile() {
-    return path.join(this.infoPackageDir, this.serverConfig.packageInfoName);
+  public get infoFile() {
+    return path.join(this.infoDir, this.serverConfig.packageInfoName);
   }
 
   public get proxyScope() {
@@ -147,18 +137,24 @@ export class Meta {
     return Meta.getApiMeta(this.url).path;
   }
 
-  // protected getTarballDir(folderName: string) {
-  //   return path.join(this.storageDir, folderName, this.parsedUrl.dir);
-  // }
+  public async proxy(
+    formatter: (targetUrl: string) => RequestOptionsFormatter = () =>
+      (options) =>
+        options
+  ) {
+    const data = await this.data;
 
-  // protected getInfoDir(folderName: string) {
-  //   return path.join(
-  //     this.storageDir,
-  //     folderName,
-  //     this.parsedUrl.dir,
-  //     this.parsedUrl.base
-  //   );
-  // }
+    for (const targetUrl of this.proxyUrls) {
+      const request = proxyRequest(this.req, targetUrl)(formatter(targetUrl));
+      const { res } = await request(data);
+
+      if (res && Meta.isResSuccessful(this.res)) {
+        return await getIncomingMessageData(res);
+      }
+    }
+
+    return null;
+  }
 
   static getApiMeta(url: string) {
     const result = url.match(/^api\/(v(\d*))\/(.*)/) ?? [];
@@ -170,5 +166,11 @@ export class Meta {
     const result = url.match(/^\/(.*)\/(.*)/) ?? [];
 
     return { scope: result[1] ?? "", name: result[2] ?? "" };
+  }
+
+  static isResSuccessful(res: ServerResponse | IncomingMessage): boolean {
+    return typeof res.statusCode === "number"
+      ? res.statusCode >= 200 && res.statusCode < 300
+      : false;
   }
 }

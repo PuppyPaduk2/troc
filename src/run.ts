@@ -3,6 +3,8 @@ import { createServer } from "./create-server";
 const port = 4000;
 
 (async () => {
+  console.log("Starting server...");
+
   const proxyScopeUrls: Record<string, string[]> = {
     "@types": ["http://0.0.0.0:5002/npm", "https://registry.npmjs.org"],
   };
@@ -14,6 +16,7 @@ const port = 4000;
     "http://0.0.0.0:5002/npm",
     "https://registry.npmjs.org",
   ];
+
   const server = await createServer({
     proxyScopeUrls,
     proxyCommandUrls,
@@ -22,5 +25,5 @@ const port = 4000;
 
   server.listen(port);
 
-  console.log(`Server created http://localhost:${port}`);
+  console.log(`Server started http://localhost:${port}`);
 })();

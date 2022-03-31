@@ -1,4 +1,8 @@
-export type PackageInfo = {
+export type NpmResponse = {
+  error?: string;
+};
+
+export type PackageInfo = NpmResponse & {
   versions: Record<string, PackageVersion>;
   _attachments: Record<string, { data: string }>;
 };

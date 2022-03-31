@@ -12,7 +12,9 @@ export type ServerEnvs = {
   storageDir: string;
   packagesFolder: string;
   proxyFolder: string;
+  registryFolder: string;
   packageInfoName: string;
+  tokensName: string;
 };
 
 const storageDir = path.join(__dirname, "storage");
@@ -27,7 +29,9 @@ export class Config {
   public serverEnvs: ServerEnvs = {
     packagesFolder: "packages",
     proxyFolder: "proxy",
+    registryFolder: "registry",
     packageInfoName: "info.json",
+    tokensName: "tokens.json",
     storageDir,
   };
 
@@ -43,18 +47,27 @@ export class Config {
     return this.serverConfig.storageDir ?? this.serverEnvs.storageDir;
   }
 
+  // TODO remove
   public get proxyFolder() {
     return this.serverEnvs.proxyFolder;
   }
 
+  // TODO remove
   public get packagesFolder() {
     return this.serverEnvs.packagesFolder;
   }
 
+  // TODO remove
+  public get registryFolder() {
+    return this.serverEnvs.registryFolder;
+  }
+
+  // TODO remove
   public get packageInfoName() {
     return this.serverEnvs.packageInfoName;
   }
 
+  // TODO remove
   public get proxyUrls() {
     return {
       scope: this.serverConfig.proxyScopeUrls,
