@@ -1,7 +1,5 @@
 import { Server, createServer as createServerHttp } from "http";
 import * as fs from "fs/promises";
-import * as path from "path";
-import * as merge from "merge";
 
 import { colors } from "../utils/colors";
 import { Meta } from "./meta";
@@ -11,7 +9,7 @@ import {
   NpmResponse,
   PackageInfo,
 } from "../utils/package";
-import { accessSoft, readJson } from "../utils/fs";
+import { accessSoft } from "../utils/fs";
 import { Config, ServerConfig, ServerEnvs } from "./config";
 import { removeProps } from "../utils/object";
 import {
@@ -22,9 +20,8 @@ import {
   sendUnauthorized,
 } from "./responses";
 import { NpmTokenResponse, Tokens } from "./tokens";
-import { generateToken } from "../utils/crypto";
 
-export async function createServer(
+export async function createProxyServer(
   config: Partial<ServerConfig> = {},
   envs: Partial<ServerEnvs> = {}
 ): Promise<Server> {

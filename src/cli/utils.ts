@@ -1,7 +1,7 @@
 import { Server } from "net";
 import * as path from "path";
 
-import { ServerConfig } from "../create-server/config";
+import { ServerConfig } from "../create-proxy-server/config";
 
 export const npmUrl = "https://registry.npmjs.org";
 export const defPort = 4000;

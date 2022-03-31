@@ -4,7 +4,7 @@ import { copyFile, writeFile, rm } from "fs/promises";
 import * as path from "path";
 
 import { version } from "../../package.json";
-import { createServer } from "../create-server";
+import { createProxyServer } from "../create-proxy-server";
 import { accessSoft } from "../utils/fs";
 import { getPort } from "../utils/net";
 import {
@@ -21,7 +21,7 @@ import {
 // TODO test default value of options of command
 program
   .command("run")
-  .command("server")
+  .command("proxy-server")
   .option("--port <port>", "Port of server")
   .option("--hostname <hostname>", "Hostname of server")
   .option("--protocol <protocol>", "Protocol of server")
@@ -33,7 +33,7 @@ program
     const hostname = options.hostname ?? defHostname;
     const port = await getPort(options.port ? +options.port : defPort);
 
-    const server = await createServer(getServerConfig(options));
+    const server = await createProxyServer(getServerConfig(options));
 
     await runServer(server, port, hostname, protocol);
   });
@@ -85,8 +85,8 @@ program
       }
     };
 
-    const server = await createServer(getServerConfig(options)).then((server) =>
-      runServer(server, port, hostname, protocol)
+    const server = await createProxyServer(getServerConfig(options)).then(
+      (server) => runServer(server, port, hostname, protocol)
     );
 
     if (server instanceof Error) {

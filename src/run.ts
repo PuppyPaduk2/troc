@@ -1,4 +1,4 @@
-import { createServer } from "./create-server";
+import { createProxyServer } from "./create-proxy-server";
 
 const port = 4000;
 
@@ -17,7 +17,7 @@ const port = 4000;
     "https://registry.npmjs.org",
   ];
 
-  const server = await createServer({
+  const server = await createProxyServer({
     proxyScopeUrls,
     proxyCommandUrls,
     proxyAllUrls,
