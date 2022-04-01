@@ -5,13 +5,6 @@ import { readJson } from "../utils/fs";
 import { Config } from "./config";
 import { generateToken } from "../utils/crypto";
 
-export type NpmTokenResponse = {
-  ok: boolean;
-  id: string;
-  rev: string;
-  token: string;
-};
-
 type RegistryTokenData = { token: string };
 
 type JsonDataTokens = [string, [string, RegistryTokenData][]][];

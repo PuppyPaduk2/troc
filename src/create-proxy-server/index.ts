@@ -18,8 +18,9 @@ import {
   sendOk,
   sendServiceUnavailable,
   sendUnauthorized,
-} from "./responses";
-import { NpmTokenResponse, Tokens } from "./tokens";
+} from "../utils/responses";
+import { Tokens } from "./tokens";
+import { NpmTokenResponse } from "../utils/npm";
 
 export async function createProxyServer(
   config: Partial<ServerConfig> = {},

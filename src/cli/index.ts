@@ -2,6 +2,7 @@ import { program } from "commander";
 import { spawn } from "child_process";
 import { copyFile, writeFile, rm } from "fs/promises";
 import * as path from "path";
+import prompts from "prompts";
 
 import { version } from "../../package.json";
 import { createProxyServer } from "../create-proxy-server";
@@ -17,8 +18,8 @@ import {
   npmrcName,
   runServer,
 } from "./utils";
+import { fetch } from "../utils/fetch";
 
-// TODO test default value of options of command
 program
   .command("run")
   .command("proxy-server")
@@ -110,5 +111,20 @@ program
     await revertNpmrc();
     process.exit(code ?? undefined);
   });
+
+program.command("signup").action(async () => {
+  const creds = await prompts([
+    { type: "text", name: "login", message: "Login" },
+    { type: "password", name: "password", message: "Password" },
+    { type: "text", name: "email", message: "Email" },
+  ]);
+
+  const res = await fetch("http://localhost:5000/api/v1/signup", {
+    method: "POST",
+    body: JSON.stringify(creds),
+  });
+
+  console.log(res.status);
+});
 
 program.version(version).parse(process.argv);

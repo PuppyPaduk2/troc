@@ -7,14 +7,21 @@ const ShellPlugin = require("./utils/shell-plugin");
 
 const cwd = process.cwd();
 
-module.exports = ({ server }) => ({
+module.exports = ({ proxyServer, registryServer }) => ({
   mode: "development",
   target: "node",
   devtool: "source-map",
-  entry: {
-    run: path.resolve(cwd, "./src/run"),
-    cli: path.resolve(cwd, "./src/cli"),
-  },
+  entry: Object.assign(
+    {
+      cli: path.resolve(cwd, "./src/cli"),
+    },
+    proxyServer && {
+      "run-proxy-server": path.resolve(cwd, "./src/run-proxy-server"),
+    },
+    registryServer && {
+      "run-registry-server": path.resolve(cwd, "./src/run-registry-server"),
+    }
+  ),
   module: {
     rules: [
       {
@@ -39,10 +46,16 @@ module.exports = ({ server }) => ({
     aggregateTimeout: 100,
   },
   plugins: [
-    server &&
+    proxyServer &&
       new NodemonPlugin({
-        script: "./dist/run.js",
-        watch: path.resolve("./dist/run.js"),
+        script: "./dist/run-proxy-server.js",
+        watch: path.resolve("./dist/run-proxy-server.js"),
+        delay: "200",
+      }),
+    registryServer &&
+      new NodemonPlugin({
+        script: "./dist/run-registry-server.js",
+        watch: path.resolve("./dist/run-registry-server.js"),
         delay: "200",
       }),
     new ShellPlugin("emit", "node ./scripts/after-build.js"),

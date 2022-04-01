@@ -18,3 +18,13 @@ export async function readJson<R extends object>(
     return null;
   }
 }
+
+export async function writeJson(
+  file: string,
+  data: object,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  replacer?: ((this: any, key: string, value: any) => any) | null,
+  space?: string | number
+): Promise<void> {
+  return fs.writeFile(file, JSON.stringify(data, replacer ?? undefined, space));
+}
