@@ -51,7 +51,13 @@ async function handleCommand(meta: RequestMeta): Promise<void> {
     colors.cyan.bold(meta.command),
     meta.url
   );
-  console.log(meta.token);
+
+  if (meta.token) {
+    console.log(
+      colors.bgCyan.black(meta.headers.npmSession),
+      colors.green(meta.token)
+    );
+  }
 
   const handler = commandHandlers[meta.command];
 
@@ -68,6 +74,7 @@ const commandHandlers: Record<string, (meta: RequestMeta) => Promise<void>> = {
   view: handleViewCommand,
   adduser: handleAdduserCommand,
   logout: handleLogoutCommand,
+  whoami: handleWhoamiCommand,
 };
 
 async function handleInstallCommand(meta: RequestMeta): Promise<void> {
@@ -159,6 +166,8 @@ async function handleAdduserCommand(meta: RequestMeta): Promise<void> {
 
   const token = meta.infraStorage.tokens.create({ username: creds.name });
 
+  await meta.infraStorage.writeTokens();
+
   return await sendOk(meta.res, { end: JSON.stringify({ token }) });
 }
 
@@ -175,6 +184,18 @@ async function handleLogoutCommand(meta: RequestMeta): Promise<void> {
   await meta.infraStorage.writeTokens();
 
   return await sendOk(meta.res);
+}
+
+async function handleWhoamiCommand(meta: RequestMeta): Promise<void> {
+  const tokenData = meta.infraStorage.tokens.get(meta.token);
+
+  if (!tokenData) {
+    return await sendUnauthorized(meta.res);
+  }
+
+  return await sendOk(meta.res, {
+    end: JSON.stringify({ username: tokenData.username }),
+  });
 }
 
 async function handleApi(meta: RequestMeta): Promise<void> {
