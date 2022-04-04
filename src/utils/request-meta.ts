@@ -2,7 +2,7 @@ import { IncomingMessage, ServerResponse } from "http";
 import * as path from "path";
 import * as url from "url";
 
-import { InfraStorage } from "./infra-storage";
+import { DataStorage } from "./data-storage";
 import { getIncomingMessageData } from "./request";
 import { ServerConfig } from "./server-config";
 
@@ -10,18 +10,18 @@ export class RequestMeta {
   public req: IncomingMessage;
   public res: ServerResponse;
   public serverConfig: ServerConfig;
-  public infraStorage: InfraStorage;
+  public dataStorage: DataStorage;
 
   constructor(params: {
     req: IncomingMessage;
     res: ServerResponse;
     serverConfig: ServerConfig;
-    infraStorage: InfraStorage;
+    dataStorage: DataStorage;
   }) {
     this.req = params.req;
     this.res = params.res;
     this.serverConfig = params.serverConfig;
-    this.infraStorage = params.infraStorage;
+    this.dataStorage = params.dataStorage;
   }
 
   public get url() {

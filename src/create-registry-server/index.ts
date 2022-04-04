@@ -15,21 +15,21 @@ import {
 import { ServerConfig } from "../utils/server-config";
 import { PackageInfo } from "../utils/package";
 import { removeProps } from "../utils/object";
-import { InfraStorage, Users } from "../utils/infra-storage";
+import { DataStorage } from "../utils/data-storage";
 import { NpmCredentials } from "../utils/npm";
 
 export function createRegistryServer(params: {
   serverConfig: ServerConfig;
-  infraStorage: InfraStorage;
+  dataStorage: DataStorage;
 }): Server {
-  const { serverConfig, infraStorage } = params;
+  const { serverConfig, dataStorage } = params;
 
   return createServerHttp(async (req, res) => {
     const meta: RequestMeta = new RequestMeta({
       req,
       res,
       serverConfig,
-      infraStorage,
+      dataStorage,
     });
 
     if (meta.command) {
@@ -154,19 +154,19 @@ async function handleAdduserCommand(meta: RequestMeta): Promise<void> {
     return await sendUnauthorized(meta.res);
   }
 
-  const user = meta.infraStorage.users.get(creds.name ?? "");
+  const user = await meta.dataStorage.users.get(creds.name ?? "");
 
   if (!user) {
     return await sendUnauthorized(meta.res);
   }
 
-  if (Users.password(creds.password) !== user.password) {
+  if (
+    (await DataStorage.usersUtils.password(creds.password)) !== user.password
+  ) {
     return await sendUnauthorized(meta.res);
   }
 
-  const token = meta.infraStorage.tokens.create({ username: creds.name });
-
-  await meta.infraStorage.writeTokens();
+  const token = await meta.dataStorage.tokens.create({ username: creds.name });
 
   return await sendOk(meta.res, { end: JSON.stringify({ token }) });
 }
@@ -176,18 +176,17 @@ async function handleLogoutCommand(meta: RequestMeta): Promise<void> {
     return await sendOk(meta.res);
   }
 
-  if (!meta.infraStorage.tokens.has(meta.token)) {
+  if (!(await meta.dataStorage.tokens.has(meta.token))) {
     return await sendOk(meta.res);
   }
 
-  meta.infraStorage.tokens.delete(meta.token);
-  await meta.infraStorage.writeTokens();
+  await meta.dataStorage.tokens.delete(meta.token);
 
   return await sendOk(meta.res);
 }
 
 async function handleWhoamiCommand(meta: RequestMeta): Promise<void> {
-  const tokenData = meta.infraStorage.tokens.get(meta.token);
+  const tokenData = await meta.dataStorage.tokens.get(meta.token);
 
   if (!tokenData) {
     return await sendUnauthorized(meta.res);
@@ -235,15 +234,14 @@ async function handleSignup(meta: RequestMeta): Promise<void> {
 
   const login = creds.login.toLocaleLowerCase();
 
-  if (meta.infraStorage.users.has(login)) {
+  if (await meta.dataStorage.users.has(login)) {
     return await sendBadRequest(meta.res);
   }
 
-  meta.infraStorage.users.set(login, {
-    password: Users.password(creds.password),
+  await meta.dataStorage.users.set(login, {
+    password: await DataStorage.usersUtils.password(creds.password),
     email: creds.email,
   });
-  await meta.infraStorage.writeUsers();
 
   return await sendOk(meta.res);
 }

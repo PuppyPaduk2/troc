@@ -1,7 +1,7 @@
 import * as path from "path";
 
 import { createRegistryServer } from "./create-registry-server";
-import { InfraStorage } from "./utils/infra-storage";
+import { DataStorage } from "./utils/data-storage";
 import { ServerConfig } from "./utils/server-config";
 
 const port = 5000;
@@ -12,12 +12,22 @@ const port = 5000;
   const serverConfig = new ServerConfig({
     storageDir: path.join(__dirname, "my-storage"),
   });
-  const infraStorage = new InfraStorage({ serverConfig });
-
-  await infraStorage.readUsers();
-  await infraStorage.readTokens();
-
-  const server = createRegistryServer({ serverConfig, infraStorage });
+  const dataStorage = new DataStorage(
+    {
+      users: await serverConfig.readUsers(),
+      tokens: await serverConfig.readTokens(),
+    },
+    {
+      onChange: async (name) => {
+        if (name === "users") {
+          await serverConfig.writeUsers(await dataStorage.users.serialize());
+        } else if (name === "tokens") {
+          await serverConfig.writeTokens(await dataStorage.tokens.serialize());
+        }
+      },
+    }
+  );
+  const server = createRegistryServer({ serverConfig, dataStorage });
 
   server.listen(port);
   console.log(`Server started http://localhost:${port}`);
