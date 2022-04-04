@@ -95,6 +95,16 @@ export class RequestMeta {
     return auth[1] ?? auth[0] ?? "";
   }
 
+  public get tokenShort() {
+    const token = this.token;
+
+    if (!token) {
+      return "";
+    }
+
+    return `${token.slice(0, 6)}...${token.slice(-8)}`;
+  }
+
   static getHeader(value?: string | string[]): string {
     if (Array.isArray(value)) {
       return value[0] ?? "";

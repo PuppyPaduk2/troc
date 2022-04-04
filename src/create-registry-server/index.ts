@@ -55,7 +55,7 @@ async function handleCommand(meta: RequestMeta): Promise<void> {
   if (meta.token) {
     console.log(
       colors.bgCyan.black(meta.headers.npmSession),
-      colors.green(meta.token)
+      colors.green(meta.tokenShort)
     );
   }
 
