@@ -4,6 +4,6 @@ apps
 registry-*
 src-*
 dist
-pack
+pack*
 libs
 p1

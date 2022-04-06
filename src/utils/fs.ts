@@ -9,6 +9,14 @@ export async function accessSoft(file: string): Promise<boolean> {
   }
 }
 
+export async function readFileSoft(file: string): Promise<Buffer> {
+  try {
+    return await fs.readFile(file);
+  } catch {
+    return Buffer.from([]);
+  }
+}
+
 export async function readJson<R extends object>(
   file: string
 ): Promise<R | null> {

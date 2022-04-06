@@ -18,11 +18,11 @@ import { removeProps } from "../utils/object";
 import { DataStorage } from "../utils/data-storage";
 import { NpmCredentials } from "../utils/npm";
 
-export function createRegistryServer(params: {
-  serverConfig: ServerConfig;
-  dataStorage: DataStorage;
+export function createRegistryServer(params?: {
+  serverConfig?: ServerConfig;
+  dataStorage?: DataStorage;
 }): Server {
-  const { serverConfig, dataStorage } = params;
+  const { serverConfig, dataStorage } = params ?? {};
 
   return createServerHttp(async (req, res) => {
     const meta: RequestMeta = new RequestMeta({
@@ -166,7 +166,9 @@ async function handleAdduserCommand(meta: RequestMeta): Promise<void> {
     return await sendUnauthorized(meta.res);
   }
 
-  const token = await meta.dataStorage.tokens.create({ username: creds.name });
+  const token = await meta.dataStorage.tokens.create({
+    username: creds.name,
+  });
 
   return await sendOk(meta.res, { end: JSON.stringify({ token }) });
 }
@@ -215,6 +217,7 @@ async function handleApi(meta: RequestMeta): Promise<void> {
 
 const apiHandlers: Record<string, (meta: RequestMeta) => Promise<void>> = {
   "/signup": handleSignup,
+  "/token": handleToken,
 };
 
 async function handleSignup(meta: RequestMeta): Promise<void> {
@@ -244,4 +247,38 @@ async function handleSignup(meta: RequestMeta): Promise<void> {
   });
 
   return await sendOk(meta.res);
+}
+
+async function handleToken(meta: RequestMeta): Promise<void> {
+  if (meta.method === "POST") {
+    return await handleCreateToken(meta);
+  }
+
+  return await sendBadRequest(meta.res);
+}
+
+async function handleCreateToken(meta: RequestMeta): Promise<void> {
+  const data = await meta.json<{ login?: string; password?: string }>();
+
+  if (!data || !data.login || !data.password) {
+    return await sendBadRequest(meta.res);
+  }
+
+  const user = await meta.dataStorage.users.get(data.login ?? "");
+
+  if (!user) {
+    return await sendUnauthorized(meta.res);
+  }
+
+  if (
+    (await DataStorage.usersUtils.password(data.password)) !== user.password
+  ) {
+    return await sendUnauthorized(meta.res);
+  }
+
+  const token = await meta.dataStorage.tokens.create({
+    username: data.login,
+  });
+
+  return await sendOk(meta.res, { end: JSON.stringify({ token }) });
 }

@@ -15,13 +15,13 @@ export class RequestMeta {
   constructor(params: {
     req: IncomingMessage;
     res: ServerResponse;
-    serverConfig: ServerConfig;
-    dataStorage: DataStorage;
+    serverConfig?: ServerConfig;
+    dataStorage?: DataStorage;
   }) {
     this.req = params.req;
     this.res = params.res;
-    this.serverConfig = params.serverConfig;
-    this.dataStorage = params.dataStorage;
+    this.serverConfig = params.serverConfig ?? new ServerConfig();
+    this.dataStorage = params.dataStorage ?? new DataStorage();
   }
 
   public get url() {
@@ -35,6 +35,7 @@ export class RequestMeta {
       referer: headers.referer ?? "",
       npmSession: RequestMeta.getHeader(headers["npm-session"]),
       authorization: headers.authorization ?? "",
+      host: headers.host ?? "",
     };
   }
 
@@ -75,14 +76,14 @@ export class RequestMeta {
     };
   }
 
-  public get data() {
-    return getIncomingMessageData(this.req);
+  public get data(): Promise<Buffer> {
+    return RequestMeta.getData(this.req);
   }
 
-  public get dataJson() {
-    return this.data
-      .then((data) => JSON.parse(data.toString()))
-      .catch(() => null);
+  // TODO Deprecated (Need remove)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  public get dataJson(): any {
+    return RequestMeta.getDataJson(this.req);
   }
 
   public get api() {
@@ -105,6 +106,25 @@ export class RequestMeta {
     return `${token.slice(0, 6)}...${token.slice(-8)}`;
   }
 
+  public get pkg(): { scope: string; name: string } {
+    let result = this.url.match(/^\/([\w-]*)\/([\w-]*)(\/|$)/) ?? [];
+
+    if (result.length) {
+      const scope = (result[2] !== "-" ? result[1] : "") || "";
+      const name = (result[2] !== "-" ? result[2] : "") || result[1] || "";
+
+      return { scope, name };
+    }
+
+    result = this.url.match(/^\/([\w-]*)/) ?? [];
+
+    return { scope: "", name: result[1] ?? "" };
+  }
+
+  public json<T>(): Promise<T | null> {
+    return RequestMeta.getDataJson(this.req);
+  }
+
   static getHeader(value?: string | string[]): string {
     if (Array.isArray(value)) {
       return value[0] ?? "";
@@ -120,5 +140,29 @@ export class RequestMeta {
     const path = result[3] ?? "";
 
     return { version, path, query: parsedUrl.query };
+  }
+
+  static isResSuccessful(res: ServerResponse | IncomingMessage): boolean {
+    return typeof res.statusCode === "number"
+      ? res.statusCode >= 200 && res.statusCode < 300
+      : false;
+  }
+
+  static getData(res: IncomingMessage): Promise<Buffer> {
+    return getIncomingMessageData(res);
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  static parseData<T = any>(data: Buffer): T | null {
+    try {
+      return JSON.parse(data.toString());
+    } catch {
+      return null;
+    }
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  static async getDataJson<T = any>(res: IncomingMessage): Promise<T | null> {
+    return RequestMeta.parseData<T>(await RequestMeta.getData(res));
   }
 }
