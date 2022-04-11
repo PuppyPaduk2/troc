@@ -16,6 +16,28 @@ export type NpmCredentials = {
   email: string;
 };
 
+export type NpmResponse = {
+  error?: string;
+};
+
+export type PackageDist = {
+  shasum: string;
+  tarball: string;
+};
+
+export type PackageVersion = {
+  dist: PackageDist;
+};
+
+export type NpmPackageInfo = {
+  versions: Record<string, PackageVersion>;
+};
+
+export type NpmPackageInfoPublish = NpmResponse &
+  NpmPackageInfo & {
+    _attachments: Record<string, { data: string }>;
+  };
+
 export type RegistryConfig = Record<string, string> & {
   _authToken?: string;
 };
@@ -28,8 +50,8 @@ export async function getRegistryConfig(
     registryUrl instanceof URL ? registryUrl : new URL(registryUrl);
   const files = configFiles ?? [
     path.join(process.cwd(), ".npmrc"),
-    await getConfigValue("userconfig"),
-    await getConfigValue("globalconfig"),
+    await getNpmConfigValue("userconfig"),
+    await getNpmConfigValue("globalconfig"),
   ];
   const data = await Promise.all(files.reverse().map(readFileSoft));
   const lines = Buffer.concat(data).toString().trim().split("\n");
@@ -41,7 +63,7 @@ export async function getRegistryConfig(
   return Object.fromEntries(entries);
 }
 
-export async function getConfigValue(
+export async function getNpmConfigValue(
   key: string,
   cwd: string = process.cwd()
 ): Promise<string> {

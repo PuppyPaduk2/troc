@@ -13,7 +13,7 @@ import {
   runServer,
 } from "./utils";
 import { fetch } from "../utils/fetch";
-import { getConfigValue, getRegistryConfig } from "../utils/npm";
+import { getNpmConfigValue, getRegistryConfig } from "../utils/npm";
 
 program
   .command("run")
@@ -53,7 +53,7 @@ program.command("signup").action(async () => {
 const token = program.command("token");
 
 token.command("create").action(async () => {
-  const registryUrl = new URL(await getConfigValue("registry"));
+  const registryUrl = new URL(await getNpmConfigValue("registry"));
   const creds = await prompts([
     { type: "text", name: "login", message: "Login" },
     { type: "password", name: "password", message: "Password" },
@@ -73,7 +73,7 @@ token
   .option("--registry")
   .action(async (proxyRegistryUrl, token, options) => {
     const registryUrl = new URL(
-      options.registry ?? (await getConfigValue("registry"))
+      options.registry ?? (await getNpmConfigValue("registry"))
     );
     const registryConfig = await getRegistryConfig(registryUrl);
 
