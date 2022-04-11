@@ -16,7 +16,6 @@ import {
   ServerApiHandlers,
   ServerCommandHandlers,
 } from "../utils/v2/npm-server";
-import { RequestAdapter } from "../utils/v2/request-adapter";
 import { ServerConfig } from "../utils/v2/server-config";
 import { JsonCache } from "../utils/v2/json-cache";
 
@@ -35,8 +34,10 @@ type RegistryServerData = {
   }>;
 };
 
-const createRequestHandler = (handler: RequestHandler<RegistryServerData>) =>
-  NpmServer.createRequestHandler<RegistryServerData>(async (adapter) => {
+const createRequestHandler = (
+  handler: RequestHandler<void, RegistryServerData>
+) =>
+  NpmServer.createRequestHandler<void, RegistryServerData>(async (adapter) => {
     const { req } = adapter;
 
     console.log(">", req.original.method?.padEnd(4), req.url);
@@ -94,7 +95,7 @@ export class RegistryServer {
   }
 
   static handleCommandInstall = createRequestHandler(async (adapter) => {
-    const isCorrectToken = await RegistryServer.checkToken(adapter);
+    const isCorrectToken = await checkToken(adapter);
 
     if (!isCorrectToken) return await adapter.res.sendUnauthorized();
 
@@ -127,7 +128,7 @@ export class RegistryServer {
   });
 
   static handleCommandPublish = createRequestHandler(async (adapter) => {
-    const isCorrectToken = await RegistryServer.checkToken(adapter);
+    const isCorrectToken = await checkToken(adapter);
 
     if (!isCorrectToken) return await adapter.res.sendUnauthorized();
 
@@ -165,7 +166,7 @@ export class RegistryServer {
   });
 
   static handleCommandView = createRequestHandler(async (adapter) => {
-    const isCorrectToken = await RegistryServer.checkToken(adapter);
+    const isCorrectToken = await checkToken(adapter);
 
     if (!isCorrectToken) return await adapter.res.sendUnauthorized();
 
@@ -236,45 +237,47 @@ export class RegistryServer {
       return await res.sendBadRequest();
     }
 
-    const token = await RegistryServer.createToken(adapter);
+    const token = await createToken(adapter);
 
     if (!token) return await res.sendUnauthorized();
 
     return await res.sendOk({ end: JSON.stringify({ token }) });
   });
-
-  static createToken = async (
-    adapter: RequestAdapter<RegistryServerData>
-  ): Promise<string | null> => {
-    const user = await RegistryServer.checkUserCredentials(adapter);
-
-    if (!user) return null;
-
-    const token = generateToken();
-    await adapter.data.tokens.set(token, { username: user.name });
-
-    return token;
-  };
-
-  static checkUserCredentials = async (
-    adapter: RequestAdapter<RegistryServerData>
-  ): Promise<(User & { name: string }) | null> => {
-    const { req, data: db } = adapter;
-    const data = await req.json<NpmCredentials>();
-
-    if (!data || !data.name || !data.password) return null;
-
-    const user = await db.users.get(data.name);
-
-    if (!user) return null;
-    if (hmac(data.password) !== user.password) return null;
-
-    return { ...user, name: data.name };
-  };
-
-  static checkToken = async (
-    adapter: RequestAdapter<RegistryServerData>
-  ): Promise<boolean> => {
-    return Boolean(await adapter.data.tokens.get(adapter.req.token));
-  };
 }
+
+const createToken = NpmServer.createRequestHandler<
+  string | null,
+  RegistryServerData
+>(async (adapter) => {
+  const user = await checkUserCredentials(adapter);
+
+  if (!user) return null;
+
+  const token = generateToken();
+  await adapter.data.tokens.set(token, { username: user.name });
+
+  return token;
+});
+
+const checkUserCredentials = NpmServer.createRequestHandler<
+  (User & { name: string }) | null,
+  RegistryServerData
+>(async (adapter) => {
+  const { req, data: db } = adapter;
+  const data = await req.json<NpmCredentials>();
+
+  if (!data || !data.name || !data.password) return null;
+
+  const user = await db.users.get(data.name);
+
+  if (!user) return null;
+  if (hmac(data.password) !== user.password) return null;
+
+  return { ...user, name: data.name };
+});
+
+const checkToken = NpmServer.createRequestHandler<boolean, RegistryServerData>(
+  async (adapter) => {
+    return Boolean(await adapter.data.tokens.get(adapter.req.token));
+  }
+);

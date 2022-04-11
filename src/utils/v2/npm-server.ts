@@ -5,17 +5,17 @@ import { ResponseMeta } from "./response-meta";
 
 import { ServerConfig } from "./server-config";
 
-export type RequestHandler<DataAdapter = unknown> = (
+export type RequestHandler<Result = void, DataAdapter = unknown> = (
   adapter: RequestAdapter<DataAdapter>
-) => Promise<void>;
+) => Promise<Result>;
 
 export type ServerCommandHandlers<DataAdapter = unknown> = {
-  install?: RequestHandler<DataAdapter>;
-  publish?: RequestHandler<DataAdapter>;
-  view?: RequestHandler<DataAdapter>;
-  adduser?: RequestHandler<DataAdapter>;
-  logout?: RequestHandler<DataAdapter>;
-  whoami?: RequestHandler<DataAdapter>;
+  install?: RequestHandler<void, DataAdapter>;
+  publish?: RequestHandler<void, DataAdapter>;
+  view?: RequestHandler<void, DataAdapter>;
+  adduser?: RequestHandler<void, DataAdapter>;
+  logout?: RequestHandler<void, DataAdapter>;
+  whoami?: RequestHandler<void, DataAdapter>;
 };
 
 export type Command = keyof ServerCommandHandlers;
@@ -26,7 +26,7 @@ export type ApiPath = string;
 
 export type ServerApiHandlers<DataAdapter = unknown> = Record<
   ApiVersion,
-  Record<ApiPath, RequestHandler<DataAdapter>>
+  Record<ApiPath, RequestHandler<void, DataAdapter>>
 >;
 
 export class NpmServer<DataAdapter = unknown> {
@@ -91,8 +91,8 @@ export class NpmServer<DataAdapter = unknown> {
     return await adapter.res.sendBadRequest();
   }
 
-  static createRequestHandler<DataAdapter = unknown>(
-    handler: RequestHandler<DataAdapter>
+  static createRequestHandler<Result = void, DataAdapter = unknown>(
+    handler: RequestHandler<Result, DataAdapter>
   ) {
     return handler;
   }
