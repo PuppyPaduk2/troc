@@ -106,4 +106,19 @@ export class NpmServer<DataAdapter = unknown> {
       return await handler(adapter);
     };
   }
+
+  static createHandlerPipe<DataAdapter = unknown>(
+    handlers: RequestHandler<DataAdapter>[]
+  ): RequestHandler<DataAdapter> {
+    return NpmServer.createHandler<DataAdapter>(async (adapter) => {
+      const result = Promise.resolve(adapter);
+
+      for (const handler of handlers) {
+        result.then(NpmServer.createHandler(handler));
+      }
+
+      await result;
+      return adapter;
+    });
+  }
 }

@@ -34,6 +34,8 @@ type RegistryServerData = {
   }>;
 };
 
+type Handler = RequestHandler<RegistryServerData>;
+
 export class RegistryServer {
   public server: Server;
   public npmServer: NpmServer<RegistryServerData>;
@@ -68,36 +70,30 @@ export class RegistryServer {
               ...options.commandHandlers,
             }
           : {
-              install: RegistryServer.createHandler((adapter) =>
-                Promise.resolve(adapter)
-                  .then(RegistryServer.log)
-                  .then(RegistryServer.handleCommandInstall)
-              ),
-              publish: RegistryServer.createHandler((adapter) =>
-                Promise.resolve(adapter)
-                  .then(RegistryServer.log)
-                  .then(RegistryServer.handleCommandPublish)
-              ),
-              view: RegistryServer.createHandler((adapter) =>
-                Promise.resolve(adapter)
-                  .then(RegistryServer.log)
-                  .then(RegistryServer.handleCommandView)
-              ),
-              adduser: RegistryServer.createHandler((adapter) =>
-                Promise.resolve(adapter)
-                  .then(RegistryServer.log)
-                  .then(RegistryServer.handleCommandAdduser)
-              ),
-              logout: RegistryServer.createHandler((adapter) =>
-                Promise.resolve(adapter)
-                  .then(RegistryServer.log)
-                  .then(RegistryServer.handleCommandLogout)
-              ),
-              whoami: RegistryServer.createHandler((adapter) =>
-                Promise.resolve(adapter)
-                  .then(RegistryServer.log)
-                  .then(RegistryServer.handleCommandWhoami)
-              ),
+              install: NpmServer.createHandlerPipe([
+                RegistryServer.log,
+                RegistryServer.handleCommandInstall,
+              ]),
+              publish: NpmServer.createHandlerPipe([
+                RegistryServer.log,
+                RegistryServer.handleCommandPublish,
+              ]),
+              view: NpmServer.createHandlerPipe([
+                RegistryServer.log,
+                RegistryServer.handleCommandView,
+              ]),
+              adduser: NpmServer.createHandlerPipe([
+                RegistryServer.log,
+                RegistryServer.handleCommandAdduser,
+              ]),
+              logout: NpmServer.createHandlerPipe([
+                RegistryServer.log,
+                RegistryServer.handleCommandLogout,
+              ]),
+              whoami: NpmServer.createHandlerPipe([
+                RegistryServer.log,
+                RegistryServer.handleCommandWhoami,
+              ]),
             },
         apiHandlers: options?.apiHandlers ?? {
           v1: {
@@ -117,25 +113,19 @@ export class RegistryServer {
     await sessions.readAll();
   }
 
-  static createHandler(
-    handler: RequestHandler<RegistryServerData>
-  ): RequestHandler<RegistryServerData> {
-    return NpmServer.createHandler<RegistryServerData>(handler);
-  }
-
-  static dongle = RegistryServer.createHandler(async (adapter) => {
+  static dongle: Handler = async (adapter) => {
     await adapter.res.sendBadRequest();
     return adapter;
-  });
+  };
 
-  static log = RegistryServer.createHandler(async (adapter) => {
+  static log: Handler = async (adapter) => {
     const { req } = adapter;
 
     console.log(">", req.original.method?.padEnd(4), req.url);
     return adapter;
-  });
+  };
 
-  static checkCredentials = RegistryServer.createHandler(async (adapter) => {
+  static checkCredentials: Handler = async (adapter) => {
     const { req, res, data: db } = adapter;
     const data = await req.json<NpmCredentials>();
 
@@ -152,12 +142,10 @@ export class RegistryServer {
     }
 
     return adapter;
-  });
+  };
 
-  static checkMethod: (
-    methods: string[]
-  ) => RequestHandler<RegistryServerData> = (methods) =>
-    RegistryServer.createHandler(async (adapter) => {
+  static checkMethod: (methods: string[]) => Handler = (methods) => {
+    return async (adapter) => {
       const { req, res } = adapter;
 
       if (!methods.includes(req.original.method ?? "")) {
@@ -166,60 +154,47 @@ export class RegistryServer {
       }
 
       return adapter;
-    });
+    };
+  };
 
-  static checkToken = RegistryServer.createHandler(async (adapter) => {
+  static checkToken: Handler = async (adapter) => {
     if (!(await adapter.data.tokens.get(adapter.req.token))) {
       await adapter.res.sendUnauthorized();
       return adapter;
     }
 
     return adapter;
-  });
+  };
 
-  static createToken = RegistryServer.createHandler(async (adapter) => {
-    const { req, res } = adapter;
-    const data = await req.json<NpmCredentials>();
-    const token = generateToken();
+  static handleCommandInstall: Handler = async (adapter) => {
+    return Promise.resolve(adapter)
+      .then(RegistryServer.checkToken)
+      .then(async () => {
+        // audit
+        if (adapter.req.url.startsWith("/-")) {
+          await adapter.res.sendOk();
+          return adapter;
+        }
 
-    await adapter.data.tokens.set(token, { username: data?.name ?? "" });
-    await res.sendOk({ end: JSON.stringify({ token }) });
-    return adapter;
-  });
+        if (adapter.req.parsedUrl.ext) {
+          return await RegistryServer.handlerGettingTarball(adapter);
+        }
 
-  static handleCommandInstall = RegistryServer.createHandler(
-    async (adapter) => {
-      return Promise.resolve(adapter)
-        .then(RegistryServer.checkToken)
-        .then(async () => {
-          // audit
-          if (adapter.req.url.startsWith("/-")) {
-            await adapter.res.sendOk();
-            return adapter;
-          }
+        return await RegistryServer.handlerGettingInfo(adapter);
+      });
+  };
 
-          if (adapter.req.parsedUrl.ext) {
-            return await RegistryServer.handlerGettingTarball(adapter);
-          }
-
-          return await RegistryServer.handlerGettingInfo(adapter);
-        });
-    }
-  );
-
-  static handlerGettingTarball = RegistryServer.createHandler(
-    async (adapter) => {
-      if (!(await adapter.accessTarballFile())) {
-        await adapter.res.sendNotFound();
-        return adapter;
-      }
-
-      await adapter.res.sendOk({ data: await adapter.readTarballFile() });
+  static handlerGettingTarball: Handler = async (adapter) => {
+    if (!(await adapter.accessTarballFile())) {
+      await adapter.res.sendNotFound();
       return adapter;
     }
-  );
 
-  static handlerGettingInfo = RegistryServer.createHandler(async (adapter) => {
+    await adapter.res.sendOk({ data: await adapter.readTarballFile() });
+    return adapter;
+  };
+
+  static handlerGettingInfo: Handler = async (adapter) => {
     if (!(await adapter.accessInfoFile())) {
       await adapter.res.sendNotFound();
       return adapter;
@@ -227,49 +202,47 @@ export class RegistryServer {
 
     await adapter.res.sendOk({ data: await adapter.readInfoFile() });
     return adapter;
-  });
+  };
 
-  static handleCommandPublish = RegistryServer.createHandler(
-    async (adapter) => {
-      return Promise.resolve(adapter).then(async () => {
-        const pkgInfo: NpmPackageInfoPublish = (await adapter.req.json()) ?? {
-          versions: {},
-          _attachments: {},
-        };
+  static handleCommandPublish: Handler = async (adapter) => {
+    return Promise.resolve(adapter).then(async () => {
+      const pkgInfo: NpmPackageInfoPublish = (await adapter.req.json()) ?? {
+        versions: {},
+        _attachments: {},
+      };
 
-        await adapter.createTarballDir();
+      await adapter.createTarballDir();
 
-        const attachments = Object.entries(pkgInfo?._attachments ?? {});
+      const attachments = Object.entries(pkgInfo?._attachments ?? {});
 
-        for (const [fileName, { data }] of attachments) {
-          const file = path.join(adapter.paths.tarball.dir, fileName);
+      for (const [fileName, { data }] of attachments) {
+        const file = path.join(adapter.paths.tarball.dir, fileName);
 
-          if (await accessSoft(file)) {
-            await adapter.res.sendBadRequest();
-            return adapter;
-          }
-
-          await adapter.writeTarballFile(file, data);
+        if (await accessSoft(file)) {
+          await adapter.res.sendBadRequest();
+          return adapter;
         }
 
-        const currInfo = await adapter.readInfoFileJson();
-        const nextInfo: NpmPackageInfo = merge.recursive(
-          currInfo,
-          removeProps(pkgInfo, "_attachments")
-        );
+        await adapter.writeTarballFile(file, data);
+      }
 
-        await adapter.writeInfoFile(
-          adapter.paths.info.file,
-          JSON.stringify(nextInfo, null, 2)
-        );
+      const currInfo = await adapter.readInfoFileJson();
+      const nextInfo: NpmPackageInfo = merge.recursive(
+        currInfo,
+        removeProps(pkgInfo, "_attachments")
+      );
 
-        await adapter.res.sendOk();
-        return adapter;
-      });
-    }
-  );
+      await adapter.writeInfoFile(
+        adapter.paths.info.file,
+        JSON.stringify(nextInfo, null, 2)
+      );
 
-  static handleCommandView = RegistryServer.createHandler(async (adapter) => {
+      await adapter.res.sendOk();
+      return adapter;
+    });
+  };
+
+  static handleCommandView: Handler = async (adapter) => {
     return Promise.resolve(adapter)
       .then(RegistryServer.checkToken)
       .then(async () => {
@@ -281,15 +254,13 @@ export class RegistryServer {
         await adapter.res.sendOk({ data: await adapter.readInfoFile() });
         return adapter;
       });
-  });
+  };
 
-  static handleCommandAdduser = RegistryServer.createHandler(
-    async (adapter) => {
-      return await RegistryServer.handleApiCreateToken(adapter);
-    }
-  );
+  static handleCommandAdduser: Handler = async (adapter) => {
+    return await RegistryServer.handleApiCreateToken(adapter);
+  };
 
-  static handleCommandLogout = RegistryServer.createHandler(async (adapter) => {
+  static handleCommandLogout: Handler = async (adapter) => {
     const { req, res, data: db } = adapter;
 
     if (!req.token || !(await db.tokens.get(req.token))) {
@@ -300,9 +271,9 @@ export class RegistryServer {
     await db.tokens.remove(req.token);
     await res.sendOk();
     return adapter;
-  });
+  };
 
-  static handleCommandWhoami = RegistryServer.createHandler(async (adapter) => {
+  static handleCommandWhoami: Handler = async (adapter) => {
     return Promise.resolve(adapter).then(async () => {
       const { req, res, data: db } = adapter;
       const tokenData = await db.tokens.get(req.token);
@@ -317,9 +288,9 @@ export class RegistryServer {
       });
       return adapter;
     });
-  });
+  };
 
-  static handleApiSignup = RegistryServer.createHandler(async (adapter) => {
+  static handleApiSignup: Handler = async (adapter) => {
     const { req, res, data: db } = adapter;
 
     if (req.original.method !== "POST") {
@@ -352,14 +323,21 @@ export class RegistryServer {
 
     await res.sendOk();
     return adapter;
-  });
+  };
 
-  static handleApiCreateToken = RegistryServer.createHandler(
-    async (adapter) => {
-      return Promise.resolve(adapter)
-        .then(RegistryServer.checkMethod(["POST", "PUT"]))
-        .then(RegistryServer.checkCredentials)
-        .then(RegistryServer.createToken);
-    }
-  );
+  static handleApiCreateToken: Handler = async (adapter) => {
+    return await NpmServer.createHandlerPipe<RegistryServerData>([
+      RegistryServer.checkMethod(["POST", "PUT"]),
+      RegistryServer.checkCredentials,
+      async (adapter) => {
+        const { req, res } = adapter;
+        const data = await req.json<NpmCredentials>();
+        const token = generateToken();
+
+        await adapter.data.tokens.set(token, { username: data?.name ?? "" });
+        await res.sendOk({ end: JSON.stringify({ token }) });
+        return adapter;
+      },
+    ])(adapter);
+  };
 }

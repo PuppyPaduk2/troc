@@ -9,7 +9,10 @@ import { ServerConfig } from "./utils/v2/server-config";
   const registryServer = new RegistryServer({
     config: new ServerConfig({ storageDir }),
     // commandHandlers: {
-    //   whoami: RegistryServer.handleCommandWhoami,
+    //   whoami: NpmServer.createHandlerPipe([
+    //     RegistryServer.log,
+    //     RegistryServer.handleCommandWhoami,
+    //   ]),
     // },
   });
 
