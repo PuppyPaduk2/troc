@@ -5,17 +5,17 @@ import { ResponseMeta } from "./response-meta";
 
 import { ServerConfig } from "./server-config";
 
-export type RequestHandler<DataAdapter = unknown> = (
+export type NpmRequestHandler<DataAdapter = unknown> = (
   adapter: RequestAdapter<DataAdapter>
 ) => Promise<RequestAdapter<DataAdapter>>;
 
 export type ServerCommandHandlers<DataAdapter = unknown> = {
-  install?: RequestHandler<DataAdapter>;
-  publish?: RequestHandler<DataAdapter>;
-  view?: RequestHandler<DataAdapter>;
-  adduser?: RequestHandler<DataAdapter>;
-  logout?: RequestHandler<DataAdapter>;
-  whoami?: RequestHandler<DataAdapter>;
+  install?: NpmRequestHandler<DataAdapter>;
+  publish?: NpmRequestHandler<DataAdapter>;
+  view?: NpmRequestHandler<DataAdapter>;
+  adduser?: NpmRequestHandler<DataAdapter>;
+  logout?: NpmRequestHandler<DataAdapter>;
+  whoami?: NpmRequestHandler<DataAdapter>;
 };
 
 export type Command = keyof ServerCommandHandlers;
@@ -26,7 +26,7 @@ export type ApiPath = string;
 
 export type ServerApiHandlers<DataAdapter = unknown> = Record<
   ApiVersion,
-  Record<ApiPath, RequestHandler<DataAdapter>>
+  Record<ApiPath, NpmRequestHandler<DataAdapter>>
 >;
 
 export class NpmServer<DataAdapter = unknown> {
@@ -96,8 +96,8 @@ export class NpmServer<DataAdapter = unknown> {
   }
 
   static createHandler<DataAdapter = unknown>(
-    handler: RequestHandler<DataAdapter>
-  ): RequestHandler<DataAdapter> {
+    handler: NpmRequestHandler<DataAdapter>
+  ): NpmRequestHandler<DataAdapter> {
     return async (adapter) => {
       if (adapter.res.isResponse) {
         return adapter;
@@ -108,8 +108,8 @@ export class NpmServer<DataAdapter = unknown> {
   }
 
   static createHandlerPipe<DataAdapter = unknown>(
-    handlers: RequestHandler<DataAdapter>[]
-  ): RequestHandler<DataAdapter> {
+    handlers: NpmRequestHandler<DataAdapter>[]
+  ): NpmRequestHandler<DataAdapter> {
     return NpmServer.createHandler<DataAdapter>(async (adapter) => {
       const result = Promise.resolve(adapter);
 

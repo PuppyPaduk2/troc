@@ -12,45 +12,28 @@ import {
 import { removeProps } from "../utils/object";
 import {
   NpmServer,
-  RequestHandler,
   ServerApiHandlers,
   ServerCommandHandlers,
 } from "../utils/v2/npm-server";
 import { ServerConfig } from "../utils/v2/server-config";
 import { JsonCache } from "../utils/v2/json-cache";
-
-type User = {
-  password: string;
-  email: string;
-};
-
-type RegistryServerData = {
-  users: JsonCache<User>;
-  tokens: JsonCache<{
-    username: string;
-  }>;
-  sessions: JsonCache<{
-    registries: Record<string, string>;
-  }>;
-};
-
-type Handler = RequestHandler<RegistryServerData>;
+import { TrocRequestHandler, TrocServerData } from "../types";
 
 export class RegistryServer {
   public server: Server;
-  public npmServer: NpmServer<RegistryServerData>;
+  public npmServer: NpmServer<TrocServerData>;
 
   constructor(options?: {
     server?: Server;
     config?: ServerConfig;
-    data?: RegistryServerData;
-    commandHandlers?: Partial<ServerCommandHandlers<RegistryServerData>>;
-    apiHandlers?: ServerApiHandlers<RegistryServerData>;
+    data?: TrocServerData;
+    commandHandlers?: Partial<ServerCommandHandlers<TrocServerData>>;
+    apiHandlers?: ServerApiHandlers<TrocServerData>;
   }) {
     const config = options?.config ?? new ServerConfig();
 
     this.server = options?.server ?? createServer();
-    this.npmServer = new NpmServer<RegistryServerData>(
+    this.npmServer = new NpmServer<TrocServerData>(
       this.server,
       options?.data ?? {
         users: new JsonCache(path.join(config.storageDir, "users.json")),
@@ -113,19 +96,19 @@ export class RegistryServer {
     await sessions.readAll();
   }
 
-  static dongle: Handler = async (adapter) => {
+  static dongle: TrocRequestHandler = async (adapter) => {
     await adapter.res.sendBadRequest();
     return adapter;
   };
 
-  static log: Handler = async (adapter) => {
+  static log: TrocRequestHandler = async (adapter) => {
     const { req } = adapter;
 
     console.log(">", req.original.method?.padEnd(4), req.url);
     return adapter;
   };
 
-  static checkCredentials: Handler = async (adapter) => {
+  static checkCredentials: TrocRequestHandler = async (adapter) => {
     const { req, res, data: db } = adapter;
     const data = await req.json<NpmCredentials>();
 
@@ -144,7 +127,7 @@ export class RegistryServer {
     return adapter;
   };
 
-  static checkMethod: (methods: string[]) => Handler = (methods) => {
+  static checkMethod: (methods: string[]) => TrocRequestHandler = (methods) => {
     return async (adapter) => {
       const { req, res } = adapter;
 
@@ -157,7 +140,7 @@ export class RegistryServer {
     };
   };
 
-  static checkToken: Handler = async (adapter) => {
+  static checkToken: TrocRequestHandler = async (adapter) => {
     if (!(await adapter.data.tokens.get(adapter.req.token))) {
       await adapter.res.sendUnauthorized();
       return adapter;
@@ -166,7 +149,7 @@ export class RegistryServer {
     return adapter;
   };
 
-  static handleCommandInstall: Handler = async (adapter) => {
+  static handleCommandInstall: TrocRequestHandler = async (adapter) => {
     return Promise.resolve(adapter)
       .then(RegistryServer.checkToken)
       .then(async () => {
@@ -184,7 +167,7 @@ export class RegistryServer {
       });
   };
 
-  static handlerGettingTarball: Handler = async (adapter) => {
+  static handlerGettingTarball: TrocRequestHandler = async (adapter) => {
     if (!(await adapter.accessTarballFile())) {
       await adapter.res.sendNotFound();
       return adapter;
@@ -194,7 +177,7 @@ export class RegistryServer {
     return adapter;
   };
 
-  static handlerGettingInfo: Handler = async (adapter) => {
+  static handlerGettingInfo: TrocRequestHandler = async (adapter) => {
     if (!(await adapter.accessInfoFile())) {
       await adapter.res.sendNotFound();
       return adapter;
@@ -204,7 +187,7 @@ export class RegistryServer {
     return adapter;
   };
 
-  static handleCommandPublish: Handler = async (adapter) => {
+  static handleCommandPublish: TrocRequestHandler = async (adapter) => {
     return Promise.resolve(adapter).then(async () => {
       const pkgInfo: NpmPackageInfoPublish = (await adapter.req.json()) ?? {
         versions: {},
@@ -242,7 +225,7 @@ export class RegistryServer {
     });
   };
 
-  static handleCommandView: Handler = async (adapter) => {
+  static handleCommandView: TrocRequestHandler = async (adapter) => {
     return Promise.resolve(adapter)
       .then(RegistryServer.checkToken)
       .then(async () => {
@@ -256,11 +239,11 @@ export class RegistryServer {
       });
   };
 
-  static handleCommandAdduser: Handler = async (adapter) => {
+  static handleCommandAdduser: TrocRequestHandler = async (adapter) => {
     return await RegistryServer.handleApiCreateToken(adapter);
   };
 
-  static handleCommandLogout: Handler = async (adapter) => {
+  static handleCommandLogout: TrocRequestHandler = async (adapter) => {
     const { req, res, data: db } = adapter;
 
     if (!req.token || !(await db.tokens.get(req.token))) {
@@ -273,7 +256,7 @@ export class RegistryServer {
     return adapter;
   };
 
-  static handleCommandWhoami: Handler = async (adapter) => {
+  static handleCommandWhoami: TrocRequestHandler = async (adapter) => {
     return Promise.resolve(adapter).then(async () => {
       const { req, res, data: db } = adapter;
       const tokenData = await db.tokens.get(req.token);
@@ -290,7 +273,7 @@ export class RegistryServer {
     });
   };
 
-  static handleApiSignup: Handler = async (adapter) => {
+  static handleApiSignup: TrocRequestHandler = async (adapter) => {
     const { req, res, data: db } = adapter;
 
     if (req.original.method !== "POST") {
@@ -325,8 +308,8 @@ export class RegistryServer {
     return adapter;
   };
 
-  static handleApiCreateToken: Handler = async (adapter) => {
-    return await NpmServer.createHandlerPipe<RegistryServerData>([
+  static handleApiCreateToken: TrocRequestHandler = async (adapter) => {
+    return await NpmServer.createHandlerPipe<TrocServerData>([
       RegistryServer.checkMethod(["POST", "PUT"]),
       RegistryServer.checkCredentials,
       async (adapter) => {
