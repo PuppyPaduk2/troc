@@ -5,17 +5,17 @@ import { ResponseMeta } from "./response-meta";
 
 import { ServerConfig } from "./server-config";
 
-export type RequestHandler<Result = void, DataAdapter = unknown> = (
+export type RequestHandler<DataAdapter = unknown> = (
   adapter: RequestAdapter<DataAdapter>
-) => Promise<Result>;
+) => Promise<RequestAdapter<DataAdapter>>;
 
 export type ServerCommandHandlers<DataAdapter = unknown> = {
-  install?: RequestHandler<void, DataAdapter>;
-  publish?: RequestHandler<void, DataAdapter>;
-  view?: RequestHandler<void, DataAdapter>;
-  adduser?: RequestHandler<void, DataAdapter>;
-  logout?: RequestHandler<void, DataAdapter>;
-  whoami?: RequestHandler<void, DataAdapter>;
+  install?: RequestHandler<DataAdapter>;
+  publish?: RequestHandler<DataAdapter>;
+  view?: RequestHandler<DataAdapter>;
+  adduser?: RequestHandler<DataAdapter>;
+  logout?: RequestHandler<DataAdapter>;
+  whoami?: RequestHandler<DataAdapter>;
 };
 
 export type Command = keyof ServerCommandHandlers;
@@ -26,7 +26,7 @@ export type ApiPath = string;
 
 export type ServerApiHandlers<DataAdapter = unknown> = Record<
   ApiVersion,
-  Record<ApiPath, RequestHandler<void, DataAdapter>>
+  Record<ApiPath, RequestHandler<DataAdapter>>
 >;
 
 export class NpmServer<DataAdapter = unknown> {
@@ -70,17 +70,20 @@ export class NpmServer<DataAdapter = unknown> {
 
   private async handleCommand(
     adapter: RequestAdapter<DataAdapter>
-  ): Promise<void> {
+  ): Promise<RequestAdapter<DataAdapter>> {
     const handler = this.commandHandlers[adapter.req.command as Command];
 
     if (handler) {
       return await handler(adapter);
     }
 
-    return await adapter.res.sendBadRequest();
+    await adapter.res.sendBadRequest();
+    return adapter;
   }
 
-  private async handleApi(adapter: RequestAdapter<DataAdapter>): Promise<void> {
+  private async handleApi(
+    adapter: RequestAdapter<DataAdapter>
+  ): Promise<RequestAdapter<DataAdapter>> {
     const apiVersionHandlers = this.apiHandlers[adapter.req.api?.version ?? ""];
     const apiPathHandler = apiVersionHandlers[adapter.req.api?.path ?? ""];
 
@@ -88,12 +91,19 @@ export class NpmServer<DataAdapter = unknown> {
       return await apiPathHandler(adapter);
     }
 
-    return await adapter.res.sendBadRequest();
+    await adapter.res.sendBadRequest();
+    return adapter;
   }
 
-  static createRequestHandler<Result = void, DataAdapter = unknown>(
-    handler: RequestHandler<Result, DataAdapter>
-  ) {
-    return handler;
+  static createHandler<DataAdapter = unknown>(
+    handler: RequestHandler<DataAdapter>
+  ): RequestHandler<DataAdapter> {
+    return async (adapter) => {
+      if (adapter.res.isResponse) {
+        return adapter;
+      }
+
+      return await handler(adapter);
+    };
   }
 }

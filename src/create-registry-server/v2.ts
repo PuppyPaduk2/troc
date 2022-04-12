@@ -34,17 +34,6 @@ type RegistryServerData = {
   }>;
 };
 
-const createRequestHandler = (
-  handler: RequestHandler<void, RegistryServerData>
-) =>
-  NpmServer.createRequestHandler<void, RegistryServerData>(async (adapter) => {
-    const { req } = adapter;
-
-    console.log(">", req.original.method?.padEnd(4), req.url);
-
-    return await handler(adapter);
-  });
-
 export class RegistryServer {
   public server: Server;
   public npmServer: NpmServer<RegistryServerData>;
@@ -53,8 +42,8 @@ export class RegistryServer {
     server?: Server;
     config?: ServerConfig;
     data?: RegistryServerData;
-    commandHandlers?: ServerCommandHandlers;
-    apiHandlers?: ServerApiHandlers;
+    commandHandlers?: Partial<ServerCommandHandlers<RegistryServerData>>;
+    apiHandlers?: ServerApiHandlers<RegistryServerData>;
   }) {
     const config = options?.config ?? new ServerConfig();
 
@@ -68,14 +57,48 @@ export class RegistryServer {
       },
       {
         config,
-        commandHandlers: options?.commandHandlers ?? {
-          install: RegistryServer.handleCommandInstall,
-          publish: RegistryServer.handleCommandPublish,
-          view: RegistryServer.handleCommandView,
-          adduser: RegistryServer.handleCommandAdduser,
-          logout: RegistryServer.handleCommandLogout,
-          whoami: RegistryServer.handleCommandWhoami,
-        },
+        commandHandlers: options?.commandHandlers
+          ? {
+              install: RegistryServer.dongle,
+              publish: RegistryServer.dongle,
+              view: RegistryServer.dongle,
+              adduser: RegistryServer.dongle,
+              logout: RegistryServer.dongle,
+              whoami: RegistryServer.dongle,
+              ...options.commandHandlers,
+            }
+          : {
+              install: RegistryServer.createHandler((adapter) =>
+                Promise.resolve(adapter)
+                  .then(RegistryServer.log)
+                  .then(RegistryServer.handleCommandInstall)
+              ),
+              publish: RegistryServer.createHandler((adapter) =>
+                Promise.resolve(adapter)
+                  .then(RegistryServer.log)
+                  .then(RegistryServer.handleCommandPublish)
+              ),
+              view: RegistryServer.createHandler((adapter) =>
+                Promise.resolve(adapter)
+                  .then(RegistryServer.log)
+                  .then(RegistryServer.handleCommandView)
+              ),
+              adduser: RegistryServer.createHandler((adapter) =>
+                Promise.resolve(adapter)
+                  .then(RegistryServer.log)
+                  .then(RegistryServer.handleCommandAdduser)
+              ),
+              logout: RegistryServer.createHandler((adapter) =>
+                Promise.resolve(adapter)
+                  .then(RegistryServer.log)
+                  .then(RegistryServer.handleCommandLogout)
+              ),
+              whoami: RegistryServer.createHandler((adapter) =>
+                Promise.resolve(adapter)
+                  .then(RegistryServer.log)
+                  .then(RegistryServer.handleCommandWhoami)
+              ),
+            },
         apiHandlers: options?.apiHandlers ?? {
           v1: {
             "/signup": RegistryServer.handleApiSignup,
@@ -94,118 +117,215 @@ export class RegistryServer {
     await sessions.readAll();
   }
 
-  static handleCommandInstall = createRequestHandler(async (adapter) => {
-    const isCorrectToken = await checkToken(adapter);
+  static createHandler(
+    handler: RequestHandler<RegistryServerData>
+  ): RequestHandler<RegistryServerData> {
+    return NpmServer.createHandler<RegistryServerData>(handler);
+  }
 
-    if (!isCorrectToken) return await adapter.res.sendUnauthorized();
-
-    // audit
-    if (adapter.req.url.startsWith("/-")) {
-      return await adapter.res.sendOk();
-    }
-
-    if (adapter.req.parsedUrl.ext) {
-      return await RegistryServer.handlerGettingTarball(adapter);
-    }
-
-    return await RegistryServer.handlerGettingInfo(adapter);
+  static dongle = RegistryServer.createHandler(async (adapter) => {
+    await adapter.res.sendBadRequest();
+    return adapter;
   });
 
-  static handlerGettingTarball = createRequestHandler(async (adapter) => {
-    if (!(await adapter.accessTarballFile())) {
-      return await adapter.res.sendNotFound();
-    }
+  static log = RegistryServer.createHandler(async (adapter) => {
+    const { req } = adapter;
 
-    return await adapter.res.sendOk({ data: await adapter.readTarballFile() });
+    console.log(">", req.original.method?.padEnd(4), req.url);
+    return adapter;
   });
 
-  static handlerGettingInfo = createRequestHandler(async (adapter) => {
-    if (!(await adapter.accessInfoFile())) {
-      return await adapter.res.sendNotFound();
+  static checkCredentials = RegistryServer.createHandler(async (adapter) => {
+    const { req, res, data: db } = adapter;
+    const data = await req.json<NpmCredentials>();
+
+    if (!data || !data.name || !data.password) {
+      await res.sendUnauthorized();
+      return adapter;
     }
 
-    return await adapter.res.sendOk({ data: await adapter.readInfoFile() });
+    const user = await db.users.get(data.name);
+
+    if (!user || hmac(data.password) !== user.password) {
+      await res.sendUnauthorized();
+      return adapter;
+    }
+
+    return adapter;
   });
 
-  static handleCommandPublish = createRequestHandler(async (adapter) => {
-    const isCorrectToken = await checkToken(adapter);
+  static checkMethod: (
+    methods: string[]
+  ) => RequestHandler<RegistryServerData> = (methods) =>
+    RegistryServer.createHandler(async (adapter) => {
+      const { req, res } = adapter;
 
-    if (!isCorrectToken) return await adapter.res.sendUnauthorized();
-
-    const pkgInfo: NpmPackageInfoPublish = (await adapter.req.json()) ?? {
-      versions: {},
-      _attachments: {},
-    };
-
-    await adapter.createTarballDir();
-
-    const attachments = Object.entries(pkgInfo?._attachments ?? {});
-
-    for (const [fileName, { data }] of attachments) {
-      const file = path.join(adapter.paths.tarball.dir, fileName);
-
-      if (await accessSoft(file)) {
-        return adapter.res.sendBadRequest();
+      if (!methods.includes(req.original.method ?? "")) {
+        await res.sendBadRequest();
+        return adapter;
       }
 
-      await adapter.writeTarballFile(file, data);
+      return adapter;
+    });
+
+  static checkToken = RegistryServer.createHandler(async (adapter) => {
+    if (!(await adapter.data.tokens.get(adapter.req.token))) {
+      await adapter.res.sendUnauthorized();
+      return adapter;
     }
 
-    const currInfo = await adapter.readInfoFileJson();
-    const nextInfo: NpmPackageInfo = merge.recursive(
-      currInfo,
-      removeProps(pkgInfo, "_attachments")
-    );
-
-    await adapter.writeInfoFile(
-      adapter.paths.info.file,
-      JSON.stringify(nextInfo, null, 2)
-    );
-
-    return await adapter.res.sendOk();
+    return adapter;
   });
 
-  static handleCommandView = createRequestHandler(async (adapter) => {
-    const isCorrectToken = await checkToken(adapter);
+  static createToken = RegistryServer.createHandler(async (adapter) => {
+    const { req, res } = adapter;
+    const data = await req.json<NpmCredentials>();
+    const token = generateToken();
 
-    if (!isCorrectToken) return await adapter.res.sendUnauthorized();
+    await adapter.data.tokens.set(token, { username: data?.name ?? "" });
+    await res.sendOk({ end: JSON.stringify({ token }) });
+    return adapter;
+  });
 
+  static handleCommandInstall = RegistryServer.createHandler(
+    async (adapter) => {
+      return Promise.resolve(adapter)
+        .then(RegistryServer.checkToken)
+        .then(async () => {
+          // audit
+          if (adapter.req.url.startsWith("/-")) {
+            await adapter.res.sendOk();
+            return adapter;
+          }
+
+          if (adapter.req.parsedUrl.ext) {
+            return await RegistryServer.handlerGettingTarball(adapter);
+          }
+
+          return await RegistryServer.handlerGettingInfo(adapter);
+        });
+    }
+  );
+
+  static handlerGettingTarball = RegistryServer.createHandler(
+    async (adapter) => {
+      if (!(await adapter.accessTarballFile())) {
+        await adapter.res.sendNotFound();
+        return adapter;
+      }
+
+      await adapter.res.sendOk({ data: await adapter.readTarballFile() });
+      return adapter;
+    }
+  );
+
+  static handlerGettingInfo = RegistryServer.createHandler(async (adapter) => {
     if (!(await adapter.accessInfoFile())) {
-      return await adapter.res.sendNotFound();
+      await adapter.res.sendNotFound();
+      return adapter;
     }
 
-    return await adapter.res.sendOk({ data: await adapter.readInfoFile() });
+    await adapter.res.sendOk({ data: await adapter.readInfoFile() });
+    return adapter;
   });
 
-  static handleCommandAdduser = createRequestHandler(async (adapter) => {
-    return await RegistryServer.handleApiCreateToken(adapter);
+  static handleCommandPublish = RegistryServer.createHandler(
+    async (adapter) => {
+      return Promise.resolve(adapter).then(async () => {
+        const pkgInfo: NpmPackageInfoPublish = (await adapter.req.json()) ?? {
+          versions: {},
+          _attachments: {},
+        };
+
+        await adapter.createTarballDir();
+
+        const attachments = Object.entries(pkgInfo?._attachments ?? {});
+
+        for (const [fileName, { data }] of attachments) {
+          const file = path.join(adapter.paths.tarball.dir, fileName);
+
+          if (await accessSoft(file)) {
+            await adapter.res.sendBadRequest();
+            return adapter;
+          }
+
+          await adapter.writeTarballFile(file, data);
+        }
+
+        const currInfo = await adapter.readInfoFileJson();
+        const nextInfo: NpmPackageInfo = merge.recursive(
+          currInfo,
+          removeProps(pkgInfo, "_attachments")
+        );
+
+        await adapter.writeInfoFile(
+          adapter.paths.info.file,
+          JSON.stringify(nextInfo, null, 2)
+        );
+
+        await adapter.res.sendOk();
+        return adapter;
+      });
+    }
+  );
+
+  static handleCommandView = RegistryServer.createHandler(async (adapter) => {
+    return Promise.resolve(adapter)
+      .then(RegistryServer.checkToken)
+      .then(async () => {
+        if (!(await adapter.accessInfoFile())) {
+          await adapter.res.sendNotFound();
+          return adapter;
+        }
+
+        await adapter.res.sendOk({ data: await adapter.readInfoFile() });
+        return adapter;
+      });
   });
 
-  static handleCommandLogout = createRequestHandler(async (adapter) => {
+  static handleCommandAdduser = RegistryServer.createHandler(
+    async (adapter) => {
+      return await RegistryServer.handleApiCreateToken(adapter);
+    }
+  );
+
+  static handleCommandLogout = RegistryServer.createHandler(async (adapter) => {
     const { req, res, data: db } = adapter;
 
-    if (!req.token) return await res.sendOk();
-    if (!(await db.tokens.get(req.token))) return await res.sendOk();
+    if (!req.token || !(await db.tokens.get(req.token))) {
+      await res.sendOk();
+      return adapter;
+    }
 
     await db.tokens.remove(req.token);
-    return await res.sendOk();
+    await res.sendOk();
+    return adapter;
   });
 
-  static handleCommandWhoami = createRequestHandler(async (adapter) => {
-    const { req, res, data: db } = adapter;
-    const tokenData = await db.tokens.get(req.token);
+  static handleCommandWhoami = RegistryServer.createHandler(async (adapter) => {
+    return Promise.resolve(adapter).then(async () => {
+      const { req, res, data: db } = adapter;
+      const tokenData = await db.tokens.get(req.token);
 
-    if (!tokenData) return await res.sendUnauthorized();
+      if (!tokenData) {
+        await res.sendUnauthorized();
+        return adapter;
+      }
 
-    return await res.sendOk({
-      end: JSON.stringify({ username: tokenData.username }),
+      await res.sendOk({
+        end: JSON.stringify({ username: tokenData.username }),
+      });
+      return adapter;
     });
   });
 
-  static handleApiSignup = createRequestHandler(async (adapter) => {
+  static handleApiSignup = RegistryServer.createHandler(async (adapter) => {
     const { req, res, data: db } = adapter;
 
-    if (req.original.method !== "POST") return await res.sendBadRequest();
+    if (req.original.method !== "POST") {
+      await res.sendBadRequest();
+      return adapter;
+    }
 
     const data = await req.json<{
       username?: string;
@@ -214,70 +334,32 @@ export class RegistryServer {
     }>();
 
     if (!data || !data.username || !data.password || !data.email) {
-      return await res.sendBadRequest();
+      await res.sendBadRequest();
+      return adapter;
     }
 
     const username = data.username.toLocaleLowerCase();
 
-    if (await db.users.get(username)) return await res.sendBadRequest();
+    if (await db.users.get(username)) {
+      await res.sendBadRequest();
+      return adapter;
+    }
 
     await db.users.set(username, {
       password: hmac(data.password),
       email: data.email,
     });
 
-    return await res.sendOk();
+    await res.sendOk();
+    return adapter;
   });
 
-  static handleApiCreateToken = createRequestHandler(async (adapter) => {
-    const { req, res } = adapter;
-    const { method } = req.original;
-
-    if (method !== "POST" && method !== "PUT") {
-      return await res.sendBadRequest();
+  static handleApiCreateToken = RegistryServer.createHandler(
+    async (adapter) => {
+      return Promise.resolve(adapter)
+        .then(RegistryServer.checkMethod(["POST", "PUT"]))
+        .then(RegistryServer.checkCredentials)
+        .then(RegistryServer.createToken);
     }
-
-    const token = await createToken(adapter);
-
-    if (!token) return await res.sendUnauthorized();
-
-    return await res.sendOk({ end: JSON.stringify({ token }) });
-  });
+  );
 }
-
-const createToken = NpmServer.createRequestHandler<
-  string | null,
-  RegistryServerData
->(async (adapter) => {
-  const user = await checkUserCredentials(adapter);
-
-  if (!user) return null;
-
-  const token = generateToken();
-  await adapter.data.tokens.set(token, { username: user.name });
-
-  return token;
-});
-
-const checkUserCredentials = NpmServer.createRequestHandler<
-  (User & { name: string }) | null,
-  RegistryServerData
->(async (adapter) => {
-  const { req, data: db } = adapter;
-  const data = await req.json<NpmCredentials>();
-
-  if (!data || !data.name || !data.password) return null;
-
-  const user = await db.users.get(data.name);
-
-  if (!user) return null;
-  if (hmac(data.password) !== user.password) return null;
-
-  return { ...user, name: data.name };
-});
-
-const checkToken = NpmServer.createRequestHandler<boolean, RegistryServerData>(
-  async (adapter) => {
-    return Boolean(await adapter.data.tokens.get(adapter.req.token));
-  }
-);

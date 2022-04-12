@@ -8,6 +8,9 @@ import { ServerConfig } from "./utils/v2/server-config";
   const storageDir = path.join(__dirname, "registry-storage");
   const registryServer = new RegistryServer({
     config: new ServerConfig({ storageDir }),
+    // commandHandlers: {
+    //   whoami: RegistryServer.handleCommandWhoami,
+    // },
   });
 
   await registryServer.readData();

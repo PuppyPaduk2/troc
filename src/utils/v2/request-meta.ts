@@ -17,6 +17,7 @@ export type RequestMetaApi = {
 };
 
 export class RequestMeta {
+  private _data: Promise<Buffer> | null = null;
   public original: IncomingMessage;
 
   constructor(request: IncomingMessage) {
@@ -24,7 +25,11 @@ export class RequestMeta {
   }
 
   public async data(): Promise<Buffer> {
-    return await getIncomingMessageData(this.original);
+    if (!this._data) {
+      this._data = getIncomingMessageData(this.original);
+    }
+
+    return await this._data;
   }
 
   public async json<T>(): Promise<T | null> {

@@ -8,13 +8,21 @@ export type SendParams = {
 };
 
 export class ResponseMeta {
+  private _isResponse = false;
   public original: ServerResponse;
 
   constructor(response: ServerResponse) {
     this.original = response;
   }
 
+  public get isResponse(): boolean {
+    return this._isResponse;
+  }
+
   public async send(params: SendParams): Promise<void> {
+    if (this.isResponse) return;
+
+    this._isResponse = true;
     this.original.writeHead(params.statusCode, params.headers);
     if (params.data) this.original.write(params.data);
     this.original.end(params.end);
