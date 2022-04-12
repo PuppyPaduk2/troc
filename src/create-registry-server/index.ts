@@ -1,284 +1,343 @@
-import { Server, createServer as createServerHttp } from "http";
-import * as fs from "fs/promises";
-import * as path from "path";
+import { createServer, Server } from "http";
 import * as merge from "merge";
+import * as path from "path";
 
-import { colors } from "../utils/colors";
-import { accessSoft, readJson } from "../utils/fs";
-import { RequestMeta } from "../utils/request-meta";
+import { generateToken, hmac } from "../utils/crypto";
+import { accessSoft } from "../utils/fs";
 import {
-  sendBadRequest,
-  sendNotFound,
-  sendOk,
-  sendUnauthorized,
-} from "../utils/responses";
-import { ServerConfig } from "../utils/server-config";
-import { PackageInfo } from "../utils/package";
+  NpmCredentials,
+  NpmPackageInfo,
+  NpmPackageInfoPublish,
+} from "../utils/npm";
 import { removeProps } from "../utils/object";
-import { DataStorage } from "../utils/data-storage";
-import { NpmCredentials } from "../utils/npm";
+import {
+  NpmServer,
+  RequestHandler,
+  ServerApiHandlers,
+  ServerCommandHandlers,
+} from "../utils/v2/npm-server";
+import { ServerConfig } from "../utils/v2/server-config";
+import { JsonCache } from "../utils/v2/json-cache";
 
-export function createRegistryServer(params?: {
-  serverConfig?: ServerConfig;
-  dataStorage?: DataStorage;
-}): Server {
-  const { serverConfig, dataStorage } = params ?? {};
+type User = {
+  password: string;
+  email: string;
+};
 
-  return createServerHttp(async (req, res) => {
-    const meta: RequestMeta = new RequestMeta({
-      req,
-      res,
-      serverConfig,
-      dataStorage,
-    });
+type RegistryServerData = {
+  users: JsonCache<User>;
+  tokens: JsonCache<{
+    username: string;
+  }>;
+  sessions: JsonCache<{
+    registries: Record<string, string>;
+  }>;
+};
 
-    if (meta.command) {
-      return await handleCommand(meta);
-    }
+type Handler = RequestHandler<RegistryServerData>;
 
-    if (meta.api.version) {
-      return await handleApi(meta);
-    }
+export class RegistryServer {
+  public server: Server;
+  public npmServer: NpmServer<RegistryServerData>;
 
-    return await sendNotFound(meta.res);
-  });
-}
+  constructor(options?: {
+    server?: Server;
+    config?: ServerConfig;
+    data?: RegistryServerData;
+    commandHandlers?: Partial<ServerCommandHandlers<RegistryServerData>>;
+    apiHandlers?: ServerApiHandlers<RegistryServerData>;
+  }) {
+    const config = options?.config ?? new ServerConfig();
 
-async function handleCommand(meta: RequestMeta): Promise<void> {
-  console.log(
-    colors.bgCyan.black(meta.headers.npmSession),
-    colors.bgBlack.cyan(meta.method),
-    colors.cyan.bold(meta.command),
-    meta.url
-  );
-
-  if (meta.token) {
-    console.log(
-      colors.bgCyan.black(meta.headers.npmSession),
-      colors.green(meta.tokenShort)
+    this.server = options?.server ?? createServer();
+    this.npmServer = new NpmServer<RegistryServerData>(
+      this.server,
+      options?.data ?? {
+        users: new JsonCache(path.join(config.storageDir, "users.json")),
+        tokens: new JsonCache(path.join(config.storageDir, "tokens.json")),
+        sessions: new JsonCache(path.join(config.storageDir, "sessions.json")),
+      },
+      {
+        config,
+        commandHandlers: options?.commandHandlers
+          ? {
+              install: RegistryServer.dongle,
+              publish: RegistryServer.dongle,
+              view: RegistryServer.dongle,
+              adduser: RegistryServer.dongle,
+              logout: RegistryServer.dongle,
+              whoami: RegistryServer.dongle,
+              ...options.commandHandlers,
+            }
+          : {
+              install: NpmServer.createHandlerPipe([
+                RegistryServer.log,
+                RegistryServer.handleCommandInstall,
+              ]),
+              publish: NpmServer.createHandlerPipe([
+                RegistryServer.log,
+                RegistryServer.handleCommandPublish,
+              ]),
+              view: NpmServer.createHandlerPipe([
+                RegistryServer.log,
+                RegistryServer.handleCommandView,
+              ]),
+              adduser: NpmServer.createHandlerPipe([
+                RegistryServer.log,
+                RegistryServer.handleCommandAdduser,
+              ]),
+              logout: NpmServer.createHandlerPipe([
+                RegistryServer.log,
+                RegistryServer.handleCommandLogout,
+              ]),
+              whoami: NpmServer.createHandlerPipe([
+                RegistryServer.log,
+                RegistryServer.handleCommandWhoami,
+              ]),
+            },
+        apiHandlers: options?.apiHandlers ?? {
+          v1: {
+            "/signup": RegistryServer.handleApiSignup,
+            "/create-token": RegistryServer.handleApiCreateToken,
+          },
+        },
+      }
     );
   }
 
-  const handler = commandHandlers[meta.command];
+  public async readData(): Promise<void> {
+    const { users, tokens, sessions } = this.npmServer.data;
 
-  if (!handler) {
-    return await sendNotFound(meta.res);
+    await users.readAll();
+    await tokens.readAll();
+    await sessions.readAll();
   }
 
-  return await handler(meta);
-}
+  static dongle: Handler = async (adapter) => {
+    await adapter.res.sendBadRequest();
+    return adapter;
+  };
 
-const commandHandlers: Record<string, (meta: RequestMeta) => Promise<void>> = {
-  install: handleInstallCommand,
-  publish: handlePublishCommand,
-  view: handleViewCommand,
-  adduser: handleAdduserCommand,
-  logout: handleLogoutCommand,
-  whoami: handleWhoamiCommand,
-};
+  static log: Handler = async (adapter) => {
+    const { req } = adapter;
 
-async function handleInstallCommand(meta: RequestMeta): Promise<void> {
-  // audit
-  if (meta.url.startsWith("/-")) {
-    return await sendOk(meta.res);
-  }
+    console.log(">", req.original.method?.padEnd(4), req.url);
+    return adapter;
+  };
 
-  if (meta.parsedUrl.ext) {
-    return await handleGettingTarball(meta);
-  }
+  static checkCredentials: Handler = async (adapter) => {
+    const { req, res, data: db } = adapter;
+    const data = await req.json<NpmCredentials>();
 
-  return await handleGettingInfo(meta);
-}
-
-async function handleGettingTarball(meta: RequestMeta): Promise<void> {
-  if (!(await accessSoft(meta.paths.tarball.file))) {
-    return await sendNotFound(meta.res);
-  }
-
-  return await sendOk(meta.res, {
-    data: await fs.readFile(meta.paths.tarball.file),
-  });
-}
-
-async function handleGettingInfo(meta: RequestMeta): Promise<void> {
-  if (!(await accessSoft(meta.paths.info.file))) {
-    return await sendNotFound(meta.res);
-  }
-
-  return await sendOk(meta.res, {
-    data: await fs.readFile(meta.paths.info.file),
-  });
-}
-
-async function handlePublishCommand(meta: RequestMeta): Promise<void> {
-  const pkgInfo: PackageInfo = await meta.dataJson;
-  const attachments = Object.entries(pkgInfo._attachments);
-
-  await fs.mkdir(meta.paths.tarball.dir, { recursive: true });
-
-  for (const [fileName, { data }] of attachments) {
-    const file = path.join(meta.paths.tarball.dir, fileName);
-
-    if (await accessSoft(file)) {
-      return await sendBadRequest(meta.res);
+    if (!data || !data.name || !data.password) {
+      await res.sendUnauthorized();
+      return adapter;
     }
 
-    await fs.writeFile(file, data, "base64");
-  }
+    const user = await db.users.get(data.name);
 
-  const currInfo = await readJson<PackageInfo>(meta.paths.info.file);
-  const nextInfo: PackageInfo = merge.recursive(
-    currInfo ?? {},
-    removeProps(pkgInfo, "_attachments")
-  );
+    if (!user || hmac(data.password) !== user.password) {
+      await res.sendUnauthorized();
+      return adapter;
+    }
 
-  await fs.writeFile(meta.paths.info.file, JSON.stringify(nextInfo, null, 2));
+    return adapter;
+  };
 
-  return await sendOk(meta.res);
-}
+  static checkMethod: (methods: string[]) => Handler = (methods) => {
+    return async (adapter) => {
+      const { req, res } = adapter;
 
-async function handleViewCommand(meta: RequestMeta): Promise<void> {
-  if (!(await accessSoft(meta.paths.info.file))) {
-    return await sendNotFound(meta.res);
-  }
+      if (!methods.includes(req.original.method ?? "")) {
+        await res.sendBadRequest();
+        return adapter;
+      }
 
-  return await sendOk(meta.res, {
-    data: await fs.readFile(meta.paths.info.file),
-  });
-}
+      return adapter;
+    };
+  };
 
-async function handleAdduserCommand(meta: RequestMeta): Promise<void> {
-  const creds: Partial<NpmCredentials> = await meta.dataJson;
+  static checkToken: Handler = async (adapter) => {
+    if (!(await adapter.data.tokens.get(adapter.req.token))) {
+      await adapter.res.sendUnauthorized();
+      return adapter;
+    }
 
-  if (!creds.name || !creds.password || !creds.email) {
-    return await sendUnauthorized(meta.res);
-  }
+    return adapter;
+  };
 
-  const user = await meta.dataStorage.users.get(creds.name ?? "");
+  static handleCommandInstall: Handler = async (adapter) => {
+    return Promise.resolve(adapter)
+      .then(RegistryServer.checkToken)
+      .then(async () => {
+        // audit
+        if (adapter.req.url.startsWith("/-")) {
+          await adapter.res.sendOk();
+          return adapter;
+        }
 
-  if (!user) {
-    return await sendUnauthorized(meta.res);
-  }
+        if (adapter.req.parsedUrl.ext) {
+          return await RegistryServer.handlerGettingTarball(adapter);
+        }
 
-  if (
-    (await DataStorage.usersUtils.password(creds.password)) !== user.password
-  ) {
-    return await sendUnauthorized(meta.res);
-  }
+        return await RegistryServer.handlerGettingInfo(adapter);
+      });
+  };
 
-  const token = await meta.dataStorage.tokens.create({
-    username: creds.name,
-  });
+  static handlerGettingTarball: Handler = async (adapter) => {
+    if (!(await adapter.accessTarballFile())) {
+      await adapter.res.sendNotFound();
+      return adapter;
+    }
 
-  return await sendOk(meta.res, { end: JSON.stringify({ token }) });
-}
+    await adapter.res.sendOk({ data: await adapter.readTarballFile() });
+    return adapter;
+  };
 
-async function handleLogoutCommand(meta: RequestMeta): Promise<void> {
-  if (!meta.token) {
-    return await sendOk(meta.res);
-  }
+  static handlerGettingInfo: Handler = async (adapter) => {
+    if (!(await adapter.accessInfoFile())) {
+      await adapter.res.sendNotFound();
+      return adapter;
+    }
 
-  if (!(await meta.dataStorage.tokens.has(meta.token))) {
-    return await sendOk(meta.res);
-  }
+    await adapter.res.sendOk({ data: await adapter.readInfoFile() });
+    return adapter;
+  };
 
-  await meta.dataStorage.tokens.delete(meta.token);
+  static handleCommandPublish: Handler = async (adapter) => {
+    return Promise.resolve(adapter).then(async () => {
+      const pkgInfo: NpmPackageInfoPublish = (await adapter.req.json()) ?? {
+        versions: {},
+        _attachments: {},
+      };
 
-  return await sendOk(meta.res);
-}
+      await adapter.createTarballDir();
 
-async function handleWhoamiCommand(meta: RequestMeta): Promise<void> {
-  const tokenData = await meta.dataStorage.tokens.get(meta.token);
+      const attachments = Object.entries(pkgInfo?._attachments ?? {});
 
-  if (!tokenData) {
-    return await sendUnauthorized(meta.res);
-  }
+      for (const [fileName, { data }] of attachments) {
+        const file = path.join(adapter.paths.tarball.dir, fileName);
 
-  return await sendOk(meta.res, {
-    end: JSON.stringify({ username: tokenData.username }),
-  });
-}
+        if (await accessSoft(file)) {
+          await adapter.res.sendBadRequest();
+          return adapter;
+        }
 
-async function handleApi(meta: RequestMeta): Promise<void> {
-  console.log(
-    colors.bgBlack.cyan(meta.method),
-    colors.cyan.bold(meta.api.version),
-    colors.cyan.bold(meta.api.path)
-  );
+        await adapter.writeTarballFile(file, data);
+      }
 
-  const handle = apiHandlers[meta.api.path];
+      const currInfo = await adapter.readInfoFileJson();
+      const nextInfo: NpmPackageInfo = merge.recursive(
+        currInfo,
+        removeProps(pkgInfo, "_attachments")
+      );
 
-  if (!handle) {
-    return await sendBadRequest(meta.res);
-  }
+      await adapter.writeInfoFile(
+        adapter.paths.info.file,
+        JSON.stringify(nextInfo, null, 2)
+      );
 
-  return await handle(meta);
-}
+      await adapter.res.sendOk();
+      return adapter;
+    });
+  };
 
-const apiHandlers: Record<string, (meta: RequestMeta) => Promise<void>> = {
-  "/signup": handleSignup,
-  "/token": handleToken,
-};
+  static handleCommandView: Handler = async (adapter) => {
+    return Promise.resolve(adapter)
+      .then(RegistryServer.checkToken)
+      .then(async () => {
+        if (!(await adapter.accessInfoFile())) {
+          await adapter.res.sendNotFound();
+          return adapter;
+        }
 
-async function handleSignup(meta: RequestMeta): Promise<void> {
-  if (meta.method !== "POST") {
-    return await sendBadRequest(meta.res);
-  }
+        await adapter.res.sendOk({ data: await adapter.readInfoFile() });
+        return adapter;
+      });
+  };
 
-  const creds: Partial<{
-    login: string;
-    password: string;
-    email: string;
-  }> | null = await meta.dataJson;
+  static handleCommandAdduser: Handler = async (adapter) => {
+    return await RegistryServer.handleApiCreateToken(adapter);
+  };
 
-  if (!creds || !creds.login || !creds.password || !creds.email) {
-    return await sendBadRequest(meta.res);
-  }
+  static handleCommandLogout: Handler = async (adapter) => {
+    const { req, res, data: db } = adapter;
 
-  const login = creds.login.toLocaleLowerCase();
+    if (!req.token || !(await db.tokens.get(req.token))) {
+      await res.sendOk();
+      return adapter;
+    }
 
-  if (await meta.dataStorage.users.has(login)) {
-    return await sendBadRequest(meta.res);
-  }
+    await db.tokens.remove(req.token);
+    await res.sendOk();
+    return adapter;
+  };
 
-  await meta.dataStorage.users.set(login, {
-    password: await DataStorage.usersUtils.password(creds.password),
-    email: creds.email,
-  });
+  static handleCommandWhoami: Handler = async (adapter) => {
+    return Promise.resolve(adapter).then(async () => {
+      const { req, res, data: db } = adapter;
+      const tokenData = await db.tokens.get(req.token);
 
-  return await sendOk(meta.res);
-}
+      if (!tokenData) {
+        await res.sendUnauthorized();
+        return adapter;
+      }
 
-async function handleToken(meta: RequestMeta): Promise<void> {
-  if (meta.method === "POST") {
-    return await handleCreateToken(meta);
-  }
+      await res.sendOk({
+        end: JSON.stringify({ username: tokenData.username }),
+      });
+      return adapter;
+    });
+  };
 
-  return await sendBadRequest(meta.res);
-}
+  static handleApiSignup: Handler = async (adapter) => {
+    const { req, res, data: db } = adapter;
 
-async function handleCreateToken(meta: RequestMeta): Promise<void> {
-  const data = await meta.json<{ login?: string; password?: string }>();
+    if (req.original.method !== "POST") {
+      await res.sendBadRequest();
+      return adapter;
+    }
 
-  if (!data || !data.login || !data.password) {
-    return await sendBadRequest(meta.res);
-  }
+    const data = await req.json<{
+      username?: string;
+      password?: string;
+      email?: string;
+    }>();
 
-  const user = await meta.dataStorage.users.get(data.login ?? "");
+    if (!data || !data.username || !data.password || !data.email) {
+      await res.sendBadRequest();
+      return adapter;
+    }
 
-  if (!user) {
-    return await sendUnauthorized(meta.res);
-  }
+    const username = data.username.toLocaleLowerCase();
 
-  if (
-    (await DataStorage.usersUtils.password(data.password)) !== user.password
-  ) {
-    return await sendUnauthorized(meta.res);
-  }
+    if (await db.users.get(username)) {
+      await res.sendBadRequest();
+      return adapter;
+    }
 
-  const token = await meta.dataStorage.tokens.create({
-    username: data.login,
-  });
+    await db.users.set(username, {
+      password: hmac(data.password),
+      email: data.email,
+    });
 
-  return await sendOk(meta.res, { end: JSON.stringify({ token }) });
+    await res.sendOk();
+    return adapter;
+  };
+
+  static handleApiCreateToken: Handler = async (adapter) => {
+    return await NpmServer.createHandlerPipe<RegistryServerData>([
+      RegistryServer.checkMethod(["POST", "PUT"]),
+      RegistryServer.checkCredentials,
+      async (adapter) => {
+        const { req, res } = adapter;
+        const data = await req.json<NpmCredentials>();
+        const token = generateToken();
+
+        await adapter.data.tokens.set(token, { username: data?.name ?? "" });
+        await res.sendOk({ end: JSON.stringify({ token }) });
+        return adapter;
+      },
+    ])(adapter);
+  };
 }
