@@ -1,6 +1,6 @@
 import { Server, createServer } from "http";
 import * as path from "path";
-import { RegistryServer } from "../create-registry-server";
+import { RegistryServer } from "../registry-server";
 
 import { TrocRequestHandler, TrocServerData } from "../types";
 import { generateToken, hmac } from "../utils/crypto";

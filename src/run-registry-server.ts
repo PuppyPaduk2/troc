@@ -1,6 +1,6 @@
 import * as path from "path";
 
-import { RegistryServer } from "./create-registry-server";
+import { RegistryServer } from "./registry-server";
 import { ServerConfig } from "./utils/v2/server-config";
 
 (async () => {
