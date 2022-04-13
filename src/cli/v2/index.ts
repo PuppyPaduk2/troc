@@ -1,18 +1,14 @@
 import { program } from "commander";
 
 import { version } from "../../../package.json";
-import { getNpmConfigValue } from "../../utils/npm";
+import { getNpmConfigValue, getRegistryConfig } from "../../utils/npm";
 import { fetch, Response } from "../../utils/fetch";
 
-// Registry
-const registryCommands = program.command("registry");
-
-registryCommands.description("Commands for registry server");
-
-registryCommands
+program
   .command("signup <username> <password> <email>")
-  .action(async (username, password, email) => {
-    const href = await getFetchHref("/api/v1/signup");
+  .option("--registry <registryUrl>", "Registry url")
+  .action(async (username, password, email, { registry }) => {
+    const href = await getFetchHref("/api/v1/signup", registry);
     const res = await fetch(href, {
       method: "POST",
       body: JSON.stringify({ username, password, email }),
@@ -25,19 +21,42 @@ registryCommands
     }
   });
 
-// Proxy
-const proxyCommands = program.command("proxy");
+program
+  .command("attach-token <targetRegistryUrl>")
+  .description("Attach token to proxy server for work with proxy services")
+  .option("--registry <registryUrl>", "Registry url")
+  .action(async (targetRegistryUrl, { registry }) => {
+    const { _authToken } = await getRegistryConfig(targetRegistryUrl);
 
-proxyCommands.description("Commands for proxy server");
+    if (!_authToken) {
+      console.log("Please login to", targetRegistryUrl, "through `npm login`");
+      return;
+    }
+
+    const registryUrl = await getNpmRegistryUrl(registry);
+    const href = await getFetchHref("/api/v1/attach-token", registryUrl.href);
+    const configRegistry = await getRegistryConfig(registryUrl.href);
+    const res = await fetch(href, {
+      method: "POST",
+      headers: {
+        authorization: configRegistry._authToken ?? "",
+      },
+      body: JSON.stringify({
+        registryUrl: targetRegistryUrl,
+        token: _authToken,
+      }),
+    });
+
+    if (isSuccessful(res)) {
+      console.log("Attaching token success");
+    } else {
+      console.log("Attaching token failure", res.status);
+    }
+  });
 
 program.version(version).parse(process.argv);
 
 // Utils
-async function getNpmRegistryUrl(registry?: string): Promise<URL> {
-  if (registry) return new URL(registry);
-  return new URL(await getNpmConfigValue("registry"));
-}
-
 async function getFetchHref(
   pathname: string,
   registry?: string
@@ -46,6 +65,11 @@ async function getFetchHref(
 
   registryUrl.pathname = pathname;
   return registryUrl.href;
+}
+
+async function getNpmRegistryUrl(registry?: string): Promise<URL> {
+  if (registry) return new URL(registry);
+  return new URL(await getNpmConfigValue("registry"));
 }
 
 function isSuccessful(res: Response): boolean {

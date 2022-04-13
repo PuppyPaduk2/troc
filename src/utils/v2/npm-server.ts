@@ -1,6 +1,6 @@
 import { Server } from "http";
 import { RequestAdapter } from "./request-adapter";
-import { RequestMeta } from "./request-meta";
+import { RequestMeta, RequestProxy } from "./request-meta";
 import { ResponseMeta } from "./response-meta";
 
 import { ServerConfig } from "./server-config";
@@ -35,6 +35,7 @@ export class NpmServer<DataAdapter = unknown> {
   public data: DataAdapter;
   public commandHandlers: ServerCommandHandlers<DataAdapter> = {};
   public apiHandlers: ServerApiHandlers<DataAdapter> = {};
+  public unknownHandler?: NpmRequestHandler<DataAdapter>;
 
   constructor(
     server: Server,
@@ -43,6 +44,8 @@ export class NpmServer<DataAdapter = unknown> {
       config?: ServerConfig;
       commandHandlers?: ServerCommandHandlers<DataAdapter>;
       apiHandlers?: ServerApiHandlers<DataAdapter>;
+      unknownHandler?: NpmRequestHandler<DataAdapter>;
+      proxies?: RequestProxy[];
     }
   ) {
     this.server = server;
@@ -50,9 +53,12 @@ export class NpmServer<DataAdapter = unknown> {
     this.config = options?.config ?? this.config;
     this.commandHandlers = options?.commandHandlers ?? this.commandHandlers;
     this.apiHandlers = options?.apiHandlers ?? this.apiHandlers;
+    this.unknownHandler = options?.unknownHandler;
 
     this.server.addListener("request", async (request, response) => {
-      const req: RequestMeta = new RequestMeta(request);
+      const req: RequestMeta = new RequestMeta(request, {
+        proxies: options?.proxies,
+      });
       const res: ResponseMeta = new ResponseMeta(response);
       const adapter: RequestAdapter<DataAdapter> = new RequestAdapter({
         req,
@@ -63,6 +69,9 @@ export class NpmServer<DataAdapter = unknown> {
 
       if (req.command) return await this.handleCommand(adapter);
       else if (req.api) return await this.handleApi(adapter);
+      else if (this.unknownHandler) return await this.unknownHandler(adapter);
+
+      console.log("@@@");
 
       return await res.sendBadRequest();
     });
@@ -111,10 +120,11 @@ export class NpmServer<DataAdapter = unknown> {
     handlers: NpmRequestHandler<DataAdapter>[]
   ): NpmRequestHandler<DataAdapter> {
     return NpmServer.createHandler<DataAdapter>(async (adapter) => {
-      const result = Promise.resolve(adapter);
+      let result = Promise.resolve(adapter);
 
       for (const handler of handlers) {
-        result.then(NpmServer.createHandler(handler));
+        await result;
+        result = NpmServer.createHandler<DataAdapter>(handler)(adapter);
       }
 
       await result;

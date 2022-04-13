@@ -73,8 +73,15 @@ export class JsonCache<Schema extends object> {
     return true;
   }
 
-  public async remove(id: RecordId): Promise<boolean> {
-    return this.records.delete(id);
+  public async remove(
+    id: RecordId,
+    options: { write: boolean } = { write: true }
+  ): Promise<boolean> {
+    const result = this.records.delete(id);
+
+    if (options.write) await this.writeAll();
+
+    return result;
   }
 
   public async get(id: RecordId): Promise<Schema | null> {
