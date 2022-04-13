@@ -7,14 +7,14 @@ import { generateToken, hmac } from "../utils/crypto";
 import { NpmCredentials } from "../utils/npm";
 import { removeProps } from "../utils/object";
 import { changeHostPackageInfo, PackageInfo } from "../utils/package";
-import { JsonCache } from "../utils/v2/json-cache";
+import { JsonCache } from "../utils/json-cache";
 import {
   NpmServer,
   ServerApiHandlers,
   ServerCommandHandlers,
-} from "../utils/v2/npm-server";
-import { RequestMeta, RequestProxy } from "../utils/v2/request-meta";
-import { ServerConfig } from "../utils/v2/server-config";
+} from "../utils/npm-server";
+import { RequestMeta, RequestProxy } from "../utils/request-meta";
+import { ServerConfig } from "../utils/server-config";
 
 export class ProxyServer {
   public server: Server;

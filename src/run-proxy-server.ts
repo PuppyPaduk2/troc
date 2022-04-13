@@ -1,7 +1,7 @@
 import * as path from "path";
 
 import { ProxyServer } from "./proxy-server";
-import { ServerConfig } from "./utils/v2/server-config";
+import { ServerConfig } from "./utils/server-config";
 
 (async () => {
   const port = 4000;

@@ -1,12 +1,11 @@
 import * as path from "path";
 import * as fs from "fs/promises";
 
-import { accessSoft, readFileSoft } from "../fs";
-
+import { accessSoft, readFileSoft } from "./fs";
 import { RequestMeta } from "./request-meta";
 import { ResponseMeta } from "./response-meta";
 import { ServerConfig } from "./server-config";
-import { NpmPackageInfo } from "../npm";
+import { NpmPackageInfo } from "./npm";
 
 export type RequestAdapterPaths = {
   tarball: {

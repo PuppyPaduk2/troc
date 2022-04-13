@@ -1,7 +1,7 @@
 import * as fs from "fs/promises";
 import * as uuid from "uuid";
 
-import { readFileSoft } from "../fs";
+import { readFileSoft } from "./fs";
 
 export type RecordId = string;
 

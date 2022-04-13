@@ -1,9 +1,9 @@
 node_modules
 packages
 apps
-registry-*
 src-*
 dist
+dist/registry-*
 pack*
 libs
 p1

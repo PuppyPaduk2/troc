@@ -71,8 +71,6 @@ export class NpmServer<DataAdapter = unknown> {
       else if (req.api) return await this.handleApi(adapter);
       else if (this.unknownHandler) return await this.unknownHandler(adapter);
 
-      console.log("@@@");
-
       return await res.sendBadRequest();
     });
   }

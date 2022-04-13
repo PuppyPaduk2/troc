@@ -1,5 +1,5 @@
-import { JsonCache } from "../utils/v2/json-cache";
-import { NpmRequestHandler } from "../utils/v2/npm-server";
+import { JsonCache } from "../utils/json-cache";
+import { NpmRequestHandler } from "../utils/npm-server";
 
 type User = {
   password: string;
