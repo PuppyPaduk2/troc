@@ -1,9 +1,9 @@
 import { Server } from "http";
-import { RequestAdapter } from "./request-adapter";
-import { RequestMeta, RequestProxy } from "./request-meta";
-import { ResponseMeta } from "./response-meta";
 
-import { ServerConfig } from "./server-config";
+import { RequestAdapter } from "../utils/request-adapter";
+import { RequestMeta, RequestProxy } from "../utils/request-meta";
+import { ResponseMeta } from "../utils/response-meta";
+import { ServerConfig } from "../utils/server-config";
 
 export type NpmRequestHandler<DataAdapter = unknown> = (
   adapter: RequestAdapter<DataAdapter>
