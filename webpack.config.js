@@ -13,7 +13,7 @@ module.exports = ({ proxyServer, registryServer }) => ({
   devtool: "source-map",
   entry: Object.assign(
     {
-      cli: path.resolve(cwd, "./src/cli/v2"),
+      cli: path.resolve(cwd, "./src/cli"),
     },
     proxyServer && {
       "run-proxy-server": path.resolve(cwd, "./src/run-proxy-server"),
