@@ -1,8 +1,11 @@
-import { createServer, Server } from "http";
-import * as merge from "merge";
 import * as path from "path";
+import * as merge from "merge";
 
-import { generateToken, hmac } from "../utils/crypto";
+import {
+  TrocRequestHandler,
+  TrocServer,
+  TrocServerOptions,
+} from "../troc-server";
 import { accessSoft } from "../utils/fs";
 import {
   NpmCredentials,
@@ -10,153 +13,57 @@ import {
   NpmPackageInfoPublish,
 } from "../utils/npm";
 import { removeProps } from "../utils/object";
-import {
-  NpmServer,
-  ServerApiHandlers,
-  ServerCommandHandlers,
-} from "../utils/npm-server";
-import { ServerConfig } from "../utils/server-config";
-import { JsonCache } from "../utils/json-cache";
-import { TrocRequestHandler, TrocServerData } from "../types";
+import { generateToken } from "../utils/crypto";
 
-export class RegistryServer {
-  public server: Server;
-  public npmServer: NpmServer<TrocServerData>;
-
-  constructor(options?: {
-    server?: Server;
-    config?: ServerConfig;
-    data?: TrocServerData;
-    commandHandlers?: Partial<ServerCommandHandlers<TrocServerData>>;
-    apiHandlers?: ServerApiHandlers<TrocServerData>;
-  }) {
-    const config = options?.config ?? new ServerConfig();
-
-    this.server = options?.server ?? createServer();
-    this.npmServer = new NpmServer<TrocServerData>(
-      this.server,
-      options?.data ?? {
-        users: new JsonCache(path.join(config.storageDir, "users.json")),
-        tokens: new JsonCache(path.join(config.storageDir, "tokens.json")),
-        sessions: new JsonCache(path.join(config.storageDir, "sessions.json")),
-      },
-      {
-        config,
-        commandHandlers: options?.commandHandlers
-          ? {
-              install: RegistryServer.dongle,
-              publish: RegistryServer.dongle,
-              view: RegistryServer.dongle,
-              adduser: RegistryServer.dongle,
-              logout: RegistryServer.dongle,
-              whoami: RegistryServer.dongle,
-              ...options.commandHandlers,
-            }
-          : {
-              install: NpmServer.createHandlerPipe([
-                RegistryServer.log,
-                RegistryServer.checkToken,
-                RegistryServer.handleCommandInstall,
-              ]),
-              publish: NpmServer.createHandlerPipe([
-                RegistryServer.log,
-                RegistryServer.checkToken,
-                RegistryServer.handleCommandPublish,
-              ]),
-              view: NpmServer.createHandlerPipe([
-                RegistryServer.log,
-                RegistryServer.checkToken,
-                RegistryServer.handleCommandView,
-              ]),
-              adduser: NpmServer.createHandlerPipe([
-                RegistryServer.log,
-                RegistryServer.checkMethod(["POST", "PUT"]),
-                RegistryServer.checkCredentials,
-                RegistryServer.handleCommandAdduser,
-              ]),
-              logout: NpmServer.createHandlerPipe([
-                RegistryServer.log,
-                RegistryServer.handleCommandLogout,
-              ]),
-              whoami: NpmServer.createHandlerPipe([
-                RegistryServer.log,
-                RegistryServer.checkToken,
-                RegistryServer.handleCommandWhoami,
-              ]),
-            },
-        apiHandlers: options?.apiHandlers ?? {
-          v1: {
-            "/signup": NpmServer.createHandlerPipe([
-              RegistryServer.log,
-              RegistryServer.handleApiSignup,
-            ]),
-          },
+export class RegistryServer extends TrocServer {
+  constructor(options: TrocServerOptions) {
+    const commandHandlers: TrocServerOptions["commandHandlers"] =
+      options.commandHandlers ?? {
+        install: RegistryServer.createHandlerPipe([
+          RegistryServer.log,
+          RegistryServer.checkToken,
+          RegistryServer.handleCommandInstall,
+        ]),
+        publish: RegistryServer.createHandlerPipe([
+          RegistryServer.log,
+          RegistryServer.checkToken,
+          RegistryServer.handleCommandPublish,
+        ]),
+        view: RegistryServer.createHandlerPipe([
+          RegistryServer.log,
+          RegistryServer.checkToken,
+          RegistryServer.handleCommandView,
+        ]),
+        adduser: RegistryServer.createHandlerPipe([
+          RegistryServer.log,
+          RegistryServer.checkMethod(["POST", "PUT"]),
+          RegistryServer.checkCredentials,
+          RegistryServer.handleCommandAdduser,
+        ]),
+        logout: RegistryServer.createHandlerPipe([
+          RegistryServer.log,
+          RegistryServer.handleCommandLogout,
+        ]),
+        whoami: RegistryServer.createHandlerPipe([
+          RegistryServer.log,
+          RegistryServer.checkToken,
+          RegistryServer.handleCommandWhoami,
+        ]),
+      };
+    const apiHandlers: TrocServerOptions["apiHandlers"] =
+      options.apiHandlers ?? {
+        v1: {
+          "/signup": TrocServer.createHandlerPipe([
+            TrocServer.log,
+            RegistryServer.handleApiSignup,
+          ]),
         },
-      }
-    );
+      };
+
+    super({ ...options, commandHandlers, apiHandlers });
   }
 
-  public async readData(): Promise<void> {
-    const { users, tokens, sessions } = this.npmServer.data;
-
-    await users.readAll();
-    await tokens.readAll();
-    await sessions.readAll();
-  }
-
-  static dongle: TrocRequestHandler = async (adapter) => {
-    await adapter.res.sendBadRequest();
-    return adapter;
-  };
-
-  static log: TrocRequestHandler = async (adapter) => {
-    const { req } = adapter;
-
-    console.log(">", req.original.method?.padEnd(4), req.url);
-    return adapter;
-  };
-
-  static checkCredentials: TrocRequestHandler = async (adapter) => {
-    const { req, res, data: db } = adapter;
-    const data = await req.json<NpmCredentials>();
-
-    if (!data || !data.name || !data.password) {
-      await res.sendUnauthorized();
-      return adapter;
-    }
-
-    const user = await db.users.get(data.name);
-
-    if (!user || hmac(data.password) !== user.password) {
-      await res.sendUnauthorized();
-      return adapter;
-    }
-
-    return adapter;
-  };
-
-  static checkMethod: (methods: string[]) => TrocRequestHandler = (methods) => {
-    return async (adapter) => {
-      const { req, res } = adapter;
-
-      if (!methods.includes(req.original.method ?? "")) {
-        await res.sendBadRequest();
-        return adapter;
-      }
-
-      return adapter;
-    };
-  };
-
-  static checkToken: TrocRequestHandler = async (adapter) => {
-    if (!(await adapter.data.tokens.get(adapter.req.token))) {
-      await adapter.res.sendUnauthorized();
-      return adapter;
-    }
-
-    return adapter;
-  };
-
+  // Commands
   static handleCommandInstall: TrocRequestHandler = async (adapter) => {
     // audit
     if (adapter.req.url.startsWith("/-")) {
@@ -169,26 +76,6 @@ export class RegistryServer {
     }
 
     return await RegistryServer.handlerGettingInfo(adapter);
-  };
-
-  static handlerGettingTarball: TrocRequestHandler = async (adapter) => {
-    if (!(await adapter.accessTarballFile())) {
-      await adapter.res.sendNotFound();
-      return adapter;
-    }
-
-    await adapter.res.sendOk({ data: await adapter.readTarballFile() });
-    return adapter;
-  };
-
-  static handlerGettingInfo: TrocRequestHandler = async (adapter) => {
-    if (!(await adapter.accessInfoFile())) {
-      await adapter.res.sendNotFound();
-      return adapter;
-    }
-
-    await adapter.res.sendOk({ data: await adapter.readInfoFile() });
-    return adapter;
   };
 
   static handleCommandPublish: TrocRequestHandler = async (adapter) => {
@@ -275,38 +162,26 @@ export class RegistryServer {
     return adapter;
   };
 
-  static handleApiSignup: TrocRequestHandler = async (adapter) => {
-    const { req, res, data: db } = adapter;
+  // Api
 
-    if (req.original.method !== "POST") {
-      await res.sendBadRequest();
+  // Common
+  static handlerGettingTarball: TrocRequestHandler = async (adapter) => {
+    if (!(await adapter.accessTarballFile())) {
+      await adapter.res.sendNotFound();
       return adapter;
     }
 
-    const data = await req.json<{
-      username?: string;
-      password?: string;
-      email?: string;
-    }>();
+    await adapter.res.sendOk({ data: await adapter.readTarballFile() });
+    return adapter;
+  };
 
-    if (!data || !data.username || !data.password || !data.email) {
-      await res.sendBadRequest();
+  static handlerGettingInfo: TrocRequestHandler = async (adapter) => {
+    if (!(await adapter.accessInfoFile())) {
+      await adapter.res.sendNotFound();
       return adapter;
     }
 
-    const username = data.username.toLocaleLowerCase();
-
-    if (await db.users.get(username)) {
-      await res.sendBadRequest();
-      return adapter;
-    }
-
-    await db.users.set(username, {
-      password: hmac(data.password),
-      email: data.email,
-    });
-
-    await res.sendOk();
+    await adapter.res.sendOk({ data: await adapter.readInfoFile() });
     return adapter;
   };
 }

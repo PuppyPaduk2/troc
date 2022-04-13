@@ -29,6 +29,16 @@ export type ServerApiHandlers<DataAdapter = unknown> = Record<
   Record<ApiPath, NpmRequestHandler<DataAdapter>>
 >;
 
+export type NpmServerOptions<DataAdapter = unknown> = {
+  server: Server;
+  data: DataAdapter;
+  config?: ServerConfig;
+  commandHandlers?: ServerCommandHandlers<DataAdapter>;
+  apiHandlers?: ServerApiHandlers<DataAdapter>;
+  unknownHandler?: NpmRequestHandler<DataAdapter>;
+  proxies?: RequestProxy[];
+};
+
 export class NpmServer<DataAdapter = unknown> {
   public server: Server;
   public config: ServerConfig = new ServerConfig();
@@ -37,19 +47,9 @@ export class NpmServer<DataAdapter = unknown> {
   public apiHandlers: ServerApiHandlers<DataAdapter> = {};
   public unknownHandler?: NpmRequestHandler<DataAdapter>;
 
-  constructor(
-    server: Server,
-    data: DataAdapter,
-    options?: {
-      config?: ServerConfig;
-      commandHandlers?: ServerCommandHandlers<DataAdapter>;
-      apiHandlers?: ServerApiHandlers<DataAdapter>;
-      unknownHandler?: NpmRequestHandler<DataAdapter>;
-      proxies?: RequestProxy[];
-    }
-  ) {
-    this.server = server;
-    this.data = data;
+  constructor(options: NpmServerOptions<DataAdapter>) {
+    this.server = options.server;
+    this.data = options.data;
     this.config = options?.config ?? this.config;
     this.commandHandlers = options?.commandHandlers ?? this.commandHandlers;
     this.apiHandlers = options?.apiHandlers ?? this.apiHandlers;

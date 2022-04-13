@@ -1,42 +1,17 @@
 import * as path from "path";
+import { createServer } from "http";
 
 import { ProxyServer } from "./proxy-server";
 import { ServerConfig } from "./utils/server-config";
 
 (async () => {
   const port = 4000;
-  const storageDir = path.join(__dirname, "proxy-storage-next");
   const registryServer = new ProxyServer({
-    config: new ServerConfig({ storageDir }),
+    server: createServer(),
+    config: new ServerConfig({
+      storageDir: path.join(__dirname, "proxy-storage-next"),
+    }),
     proxies: [
-      // {
-      //   url: "http://0.0.0.0:5001/npm",
-      //   names: ["webpack"],
-      //   commands: ["install"],
-      // },
-      // {
-      //   url: "http://0.0.0.0:5002/npm",
-      //   scopes: ["@types"],
-      // },
-      // {
-      //   url: "http://0.0.0.0:5002/npm",
-      //   scopes: ["@babel"],
-      // },
-      // {
-      //   url: "http://0.0.0.0:5003",
-      //   names: ["react", "react-dom"],
-      // },
-      // {
-      //   url: "https://registry.npmjs.org",
-      //   scopes: ["@types"],
-      // },
-      // {
-      //   url: "http://0.0.0.0:5005",
-      // },
-      // {
-      //   url: "http://localhost:5000",
-      //   names: ["pack-1"],
-      // },
       {
         url: "http://0.0.0.0:5000",
         names: ["pack", "pack-1"],
