@@ -42,9 +42,13 @@ export type TrocServerOptions = {
 export class TrocServer extends NpmServer<TrocServerData> {
   constructor(options: TrocServerOptions) {
     const config = options?.config ?? new ServerConfig();
-    const data = options.data ?? TrocServer.buildServerData(config);
 
-    super({ ...options, config, data });
+    super({
+      ...options,
+      initHandler: () => this.readData(),
+      data: options.data ?? TrocServer.buildServerData(config),
+      config,
+    });
   }
 
   // Server methods

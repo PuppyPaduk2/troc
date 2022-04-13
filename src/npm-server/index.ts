@@ -33,6 +33,7 @@ export type NpmServerOptions<DataAdapter = unknown> = {
   server: Server;
   data: DataAdapter;
   config?: ServerConfig;
+  initHandler?: () => Promise<void>;
   commandHandlers?: ServerCommandHandlers<DataAdapter>;
   apiHandlers?: ServerApiHandlers<DataAdapter>;
   unknownHandler?: NpmRequestHandler<DataAdapter>;
@@ -43,6 +44,8 @@ export class NpmServer<DataAdapter = unknown> {
   public server: Server;
   public config: ServerConfig = new ServerConfig();
   public data: DataAdapter;
+  public isInit = false;
+  public initHandler?: () => Promise<void>;
   public commandHandlers: ServerCommandHandlers<DataAdapter> = {};
   public apiHandlers: ServerApiHandlers<DataAdapter> = {};
   public unknownHandler?: NpmRequestHandler<DataAdapter>;
@@ -51,9 +54,16 @@ export class NpmServer<DataAdapter = unknown> {
     this.server = options.server;
     this.data = options.data;
     this.config = options?.config ?? this.config;
+    this.initHandler = options.initHandler;
     this.commandHandlers = options?.commandHandlers ?? this.commandHandlers;
     this.apiHandlers = options?.apiHandlers ?? this.apiHandlers;
     this.unknownHandler = options?.unknownHandler;
+
+    this.server.addListener("listening", async () => {
+      if (this.initHandler) await this.initHandler();
+
+      this.isInit = true;
+    });
 
     this.server.addListener("request", async (request, response) => {
       const req: RequestMeta = new RequestMeta(request, {
@@ -67,7 +77,8 @@ export class NpmServer<DataAdapter = unknown> {
         data: this.data,
       });
 
-      if (req.command) return await this.handleCommand(adapter);
+      if (!this.isInit) return await res.sendServiceUnavailable();
+      else if (req.command) return await this.handleCommand(adapter);
       else if (req.api) return await this.handleApi(adapter);
       else if (this.unknownHandler) return await this.unknownHandler(adapter);
 

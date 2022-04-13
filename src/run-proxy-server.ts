@@ -24,7 +24,6 @@ import { ServerConfig } from "./utils/server-config";
     ],
   });
 
-  await registryServer.readData();
   registryServer.server.addListener("listening", () => {
     console.log(`Server started http://localhost:${port}`);
   });

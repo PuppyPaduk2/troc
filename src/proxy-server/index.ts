@@ -11,8 +11,9 @@ import { RequestMeta } from "../utils/request-meta";
 
 export class ProxyServer extends TrocServer {
   constructor(options: TrocServerOptions) {
-    const commandHandlers: TrocServerOptions["commandHandlers"] =
-      options.commandHandlers ?? {
+    super({
+      ...options,
+      commandHandlers: options.commandHandlers ?? {
         install: ProxyServer.createHandlerPipe([
           ProxyServer.log,
           ProxyServer.checkToken,
@@ -42,9 +43,8 @@ export class ProxyServer extends TrocServer {
           ProxyServer.checkToken,
           ProxyServer.handleCommandPublish,
         ]),
-      };
-    const apiHandlers: TrocServerOptions["apiHandlers"] =
-      options.apiHandlers ?? {
+      },
+      apiHandlers: options.apiHandlers ?? {
         v1: {
           "/signup": ProxyServer.createHandlerPipe([
             ProxyServer.log,
@@ -56,9 +56,8 @@ export class ProxyServer extends TrocServer {
             ProxyServer.handleApiAttachToken,
           ]),
         },
-      };
-
-    super({ ...options, commandHandlers, apiHandlers });
+      },
+    });
   }
 
   // Commands

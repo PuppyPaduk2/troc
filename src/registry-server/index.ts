@@ -17,8 +17,9 @@ import { generateToken } from "../utils/crypto";
 
 export class RegistryServer extends TrocServer {
   constructor(options: TrocServerOptions) {
-    const commandHandlers: TrocServerOptions["commandHandlers"] =
-      options.commandHandlers ?? {
+    super({
+      ...options,
+      commandHandlers: options.commandHandlers ?? {
         install: RegistryServer.createHandlerPipe([
           RegistryServer.log,
           RegistryServer.checkToken,
@@ -49,18 +50,16 @@ export class RegistryServer extends TrocServer {
           RegistryServer.checkToken,
           RegistryServer.handleCommandWhoami,
         ]),
-      };
-    const apiHandlers: TrocServerOptions["apiHandlers"] =
-      options.apiHandlers ?? {
+      },
+      apiHandlers: options.apiHandlers ?? {
         v1: {
           "/signup": TrocServer.createHandlerPipe([
             TrocServer.log,
             RegistryServer.handleApiSignup,
           ]),
         },
-      };
-
-    super({ ...options, commandHandlers, apiHandlers });
+      },
+    });
   }
 
   // Commands
