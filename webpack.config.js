@@ -2,6 +2,7 @@ const path = require("path");
 const NodeExternals = require("webpack-node-externals");
 const NodemonPlugin = require("nodemon-webpack-plugin");
 const ForkTsCheckerWebpackPlugin = require("fork-ts-checker-webpack-plugin");
+const TerserPlugin = require("terser-webpack-plugin");
 
 const ShellPlugin = require("./utils/shell-plugin");
 
@@ -61,4 +62,8 @@ module.exports = ({ proxyServer, registryServer }) => ({
     new ShellPlugin("emit", "node ./scripts/after-build.js"),
     new ForkTsCheckerWebpackPlugin(),
   ].filter(Boolean),
+  optimization: {
+    minimize: true,
+    minimizer: [new TerserPlugin()],
+  },
 });

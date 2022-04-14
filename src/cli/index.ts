@@ -6,6 +6,7 @@ import { fetch, Response } from "../utils/fetch";
 
 program
   .command("signup <username> <password> <email>")
+  .description("Signup to registry on troc-server")
   .option("--registry <registryUrl>", "Registry url")
   .action(async (username, password, email, { registry }) => {
     const href = await getFetchHref("/api/v1/signup", registry);
