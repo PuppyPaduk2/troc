@@ -1,0 +1,13 @@
+{
+  "compilerOptions": {
+    "noEmit": false,
+    "strict": true,
+    "declaration": true,
+    "resolveJsonModule": true,
+    "downlevelIteration": true,
+    "esModuleInterop": true,
+    "target": "ES5",
+    "outDir": "./dist"
+  },
+  "exclude": ["node_modules"]
+}
