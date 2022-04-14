@@ -1,8 +1,12 @@
 import { program } from "commander";
+import { createServer } from "http";
 
 import { version } from "../../package.json";
 import { getNpmConfigValue, getRegistryConfig } from "../utils/npm";
 import { fetch, Response } from "../utils/fetch";
+import { RegistryServer } from "../registry-server";
+import { ServerConfig } from "../utils/server-config";
+import { ProxyServer } from "../proxy-server";
 
 program
   .command("signup <username> <password> <email>")
@@ -53,6 +57,43 @@ program
     } else {
       console.log("Attaching token failure", res.status);
     }
+  });
+
+const runCommand = program.command("run");
+
+runCommand
+  .command("registry")
+  .description("Run registry server")
+  .option("--port <port>", "Port of server", "4000")
+  .option("--storage-dir <storageDir>", "Path storage dir")
+  .action(async ({ port, storageDir }) => {
+    const registryServer = new RegistryServer({
+      server: createServer(),
+      config: new ServerConfig({ storageDir }),
+    });
+
+    registryServer.server.addListener("listening", () => {
+      console.log(`Server started http://localhost:${port}`);
+    });
+    registryServer.server.listen(port);
+  });
+
+runCommand
+  .command("proxy")
+  .description("Run proxy server")
+  .option("--port <port>", "Port of server", "4000")
+  .option("--storage-dir <storageDir>", "Path storage dir")
+  .action(async ({ port, storageDir }) => {
+    const proxyServer = new ProxyServer({
+      server: createServer(),
+      config: new ServerConfig({ storageDir }),
+      proxies: [{ url: "https://registry.npmjs.org", commands: ["install"] }],
+    });
+
+    proxyServer.server.addListener("listening", () => {
+      console.log(`Server started http://localhost:${port}`);
+    });
+    proxyServer.server.listen(port);
   });
 
 program.version(version).parse(process.argv);
