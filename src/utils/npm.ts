@@ -33,6 +33,10 @@ export type NpmPackageInfo = {
   versions: Record<string, PackageVersion>;
 };
 
+export type NpmPackageInfoView = NpmResponse & NpmPackageInfo;
+
+export type NpmPackageInfoInstall = NpmResponse & NpmPackageInfo;
+
 export type NpmPackageInfoPublish = NpmResponse &
   NpmPackageInfo & {
     _attachments: Record<string, { data: string }>;

@@ -3,7 +3,6 @@ import { Server } from "http";
 import { RequestAdapter } from "../utils/request-adapter";
 import { RequestMeta, RequestProxy } from "../utils/request-meta";
 import { ResponseMeta } from "../utils/response-meta";
-import { ServerConfig } from "../utils/server-config";
 
 export type NpmRequestHandler<DataAdapter = unknown> = (
   adapter: RequestAdapter<DataAdapter>
@@ -32,32 +31,35 @@ export type ServerApiHandlers<DataAdapter = unknown> = Record<
 export type NpmServerOptions<DataAdapter = unknown> = {
   server: Server;
   data: DataAdapter;
-  config?: ServerConfig;
   initHandler?: () => Promise<void>;
   commandHandlers?: ServerCommandHandlers<DataAdapter>;
   apiHandlers?: ServerApiHandlers<DataAdapter>;
   unknownHandler?: NpmRequestHandler<DataAdapter>;
   proxies?: RequestProxy[];
+  storageDir?: RequestAdapter<DataAdapter>["storageDir"];
+  formatterPackageInfo?: RequestAdapter<DataAdapter>["formatterPackageInfo"];
 };
 
 export class NpmServer<DataAdapter = unknown> {
   public server: Server;
-  public config: ServerConfig = new ServerConfig();
   public data: DataAdapter;
   public isInit = false;
   public initHandler?: () => Promise<void>;
   public commandHandlers: ServerCommandHandlers<DataAdapter> = {};
   public apiHandlers: ServerApiHandlers<DataAdapter> = {};
   public unknownHandler?: NpmRequestHandler<DataAdapter>;
+  public storageDir?: RequestAdapter<DataAdapter>["storageDir"];
+  public formatterPackageInfo?: RequestAdapter<DataAdapter>["formatterPackageInfo"];
 
   constructor(options: NpmServerOptions<DataAdapter>) {
     this.server = options.server;
     this.data = options.data;
-    this.config = options?.config ?? this.config;
     this.initHandler = options.initHandler;
     this.commandHandlers = options?.commandHandlers ?? this.commandHandlers;
     this.apiHandlers = options?.apiHandlers ?? this.apiHandlers;
     this.unknownHandler = options?.unknownHandler;
+    this.storageDir = options.storageDir;
+    this.formatterPackageInfo = options.formatterPackageInfo;
 
     this.server.addListener("listening", async () => {
       if (this.initHandler) await this.initHandler();
@@ -71,10 +73,11 @@ export class NpmServer<DataAdapter = unknown> {
       });
       const res: ResponseMeta = new ResponseMeta(response);
       const adapter: RequestAdapter<DataAdapter> = new RequestAdapter({
+        data: this.data,
+        storageDir: this.storageDir,
+        formatterPackageInfo: this.formatterPackageInfo,
         req,
         res,
-        config: this.config,
-        data: this.data,
       });
 
       if (!this.isInit) return await res.sendServiceUnavailable();

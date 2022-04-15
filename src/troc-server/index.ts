@@ -4,7 +4,7 @@ import { NpmRequestHandler, NpmServer, NpmServerOptions } from "../npm-server";
 import { hmac } from "../utils/crypto";
 import { JsonCache } from "../utils/json-cache";
 import { NpmCredentials } from "../utils/npm";
-import { ServerConfig } from "../utils/server-config";
+import { RequestAdapter } from "../utils/request-adapter";
 
 export type User = {
   password: string;
@@ -32,22 +32,20 @@ type NSOptions = NpmServerOptions<TrocServerData>;
 export type TrocServerOptions = {
   server: NSOptions["server"];
   data?: NSOptions["data"];
-  config?: NSOptions["config"];
   commandHandlers?: NSOptions["commandHandlers"];
   apiHandlers?: NSOptions["apiHandlers"];
   unknownHandler?: NSOptions["unknownHandler"];
   proxies?: NSOptions["proxies"];
+  storageDir?: NSOptions["storageDir"];
+  formatterPackageInfo?: NSOptions["formatterPackageInfo"];
 };
 
 export class TrocServer extends NpmServer<TrocServerData> {
   constructor(options: TrocServerOptions) {
-    const config = options?.config ?? new ServerConfig();
-
     super({
       ...options,
       initHandler: () => this.readData(),
-      data: options.data ?? TrocServer.buildServerData(config),
-      config,
+      data: TrocServer.buildServerData(options),
     });
   }
 
@@ -59,11 +57,15 @@ export class TrocServer extends NpmServer<TrocServerData> {
   }
 
   // Utils
-  static buildServerData(config: ServerConfig): TrocServerData {
+  static buildServerData(options?: TrocServerOptions): TrocServerData {
+    if (options?.data) return options.data;
+
+    const storageDir = options?.storageDir ?? RequestAdapter.storageDir;
+
     return {
-      users: new JsonCache(path.join(config.storageDir, "users.json")),
-      tokens: new JsonCache(path.join(config.storageDir, "tokens.json")),
-      sessions: new JsonCache(path.join(config.storageDir, "sessions.json")),
+      users: new JsonCache(path.join(storageDir, "users.json")),
+      tokens: new JsonCache(path.join(storageDir, "tokens.json")),
+      sessions: new JsonCache(path.join(storageDir, "sessions.json")),
     };
   }
 

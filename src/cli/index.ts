@@ -1,11 +1,11 @@
 import { program } from "commander";
 import { createServer } from "http";
+import * as path from "path";
 
 import { version } from "../../package.json";
 import { getNpmConfigValue, getRegistryConfig } from "../utils/npm";
 import { fetch, Response } from "../utils/fetch";
 import { RegistryServer } from "../registry-server";
-import { ServerConfig } from "../utils/server-config";
 import { ProxyServer } from "../proxy-server";
 
 program
@@ -69,7 +69,9 @@ runCommand
   .action(async ({ port, storageDir }) => {
     const registryServer = new RegistryServer({
       server: createServer(),
-      config: new ServerConfig({ storageDir }),
+      storageDir: storageDir
+        ? path.resolve(process.cwd(), storageDir)
+        : undefined,
     });
 
     registryServer.server.addListener("listening", () => {
@@ -86,7 +88,9 @@ runCommand
   .action(async ({ port, storageDir }) => {
     const proxyServer = new ProxyServer({
       server: createServer(),
-      config: new ServerConfig({ storageDir }),
+      storageDir: storageDir
+        ? path.resolve(process.cwd(), storageDir)
+        : undefined,
       proxies: [{ url: "https://registry.npmjs.org", commands: ["install"] }],
     });
 

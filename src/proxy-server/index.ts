@@ -1,12 +1,18 @@
 import {
   TrocRequestHandler,
   TrocServer,
+  TrocServerData,
   TrocServerOptions,
 } from "../troc-server";
 import { generateToken } from "../utils/crypto";
-import { NpmCredentials } from "../utils/npm";
+import {
+  NpmCredentials,
+  NpmPackageInfo,
+  NpmPackageInfoInstall,
+  NpmPackageInfoView,
+} from "../utils/npm";
 import { removeProps } from "../utils/object";
-import { changeHostPackageInfo, PackageInfo } from "../utils/package";
+import { RequestAdapter } from "../utils/request-adapter";
 import { RequestMeta } from "../utils/request-meta";
 
 export class ProxyServer extends TrocServer {
@@ -48,6 +54,7 @@ export class ProxyServer extends TrocServer {
         v1: {
           "/signup": ProxyServer.createHandlerPipe([
             ProxyServer.log,
+            // TODO Add checking users exist or no
             ProxyServer.handleApiSignup,
           ]),
           "/attach-token": ProxyServer.createHandlerPipe([
@@ -91,10 +98,10 @@ export class ProxyServer extends TrocServer {
       }));
 
       if (res && RequestMeta.isSuccess(res.statusCode ?? 0)) {
-        const info = await new RequestMeta(res).json<PackageInfo>();
+        const info = await new RequestMeta(res).json<NpmPackageInfoView>();
 
         if (info && !info.error) {
-          const data = changeHostPackageInfo(info, adapter.req.headers.host);
+          const data = await adapter.formatterPackageInfo(info, adapter);
           const dataJson = JSON.stringify(data, null, 2);
 
           await adapter.createInfoDir();
@@ -257,10 +264,10 @@ export class ProxyServer extends TrocServer {
       }));
 
       if (res && RequestMeta.isSuccess(res.statusCode ?? 0)) {
-        const info = await new RequestMeta(res).json<PackageInfo>();
+        const info = await new RequestMeta(res).json<NpmPackageInfoInstall>();
 
         if (info && !info.error) {
-          const data = changeHostPackageInfo(info, adapter.req.headers.host);
+          const data = await adapter.formatterPackageInfo(info, adapter);
           const dataJson = JSON.stringify(data, null, 2);
 
           await adapter.createInfoDir();
@@ -284,5 +291,24 @@ export class ProxyServer extends TrocServer {
   static getAuthorization(token?: string): string {
     if (!token) return "";
     return `Bearer ${token}`;
+  }
+
+  // Utils
+  static async changeHostPackageInfo(
+    info: NpmPackageInfo,
+    adapter: RequestAdapter<TrocServerData>
+  ): Promise<NpmPackageInfo> {
+    const host = adapter.req.headers.host;
+
+    // Change tarball to current host
+    Object.entries(info.versions).forEach(([, info]) => {
+      const tarball: string = info.dist.tarball;
+      const parsedTarball: URL = new URL(tarball);
+
+      parsedTarball.host = host || parsedTarball.host;
+      info.dist.tarball = parsedTarball.href;
+    });
+
+    return info;
   }
 }
