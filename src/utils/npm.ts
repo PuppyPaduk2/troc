@@ -27,11 +27,21 @@ export type PackageDist = {
 
 export type PackageVersion = {
   dist: PackageDist;
+  _npmUser?: NpmUser;
+};
+
+export type NpmUser = {
+  name: string;
+  email: string;
 };
 
 export type NpmPackageInfo = {
   versions: Record<string, PackageVersion>;
 };
+
+export type NpmPackageInfoView = NpmResponse & NpmPackageInfo;
+
+export type NpmPackageInfoInstall = NpmResponse & NpmPackageInfo;
 
 export type NpmPackageInfoPublish = NpmResponse &
   NpmPackageInfo & {

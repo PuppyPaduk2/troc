@@ -1,11 +1,11 @@
 import { program } from "commander";
 import { createServer } from "http";
+import * as path from "path";
 
 import { version } from "../../package.json";
 import { getNpmConfigValue, getRegistryConfig } from "../utils/npm";
 import { fetch, Response } from "../utils/fetch";
 import { RegistryServer } from "../registry-server";
-import { ServerConfig } from "../utils/server-config";
 import { ProxyServer } from "../proxy-server";
 
 program
@@ -69,7 +69,9 @@ runCommand
   .action(async ({ port, storageDir }) => {
     const registryServer = new RegistryServer({
       server: createServer(),
-      config: new ServerConfig({ storageDir }),
+      storageDir: storageDir
+        ? path.resolve(process.cwd(), storageDir)
+        : undefined,
     });
 
     registryServer.server.addListener("listening", () => {
@@ -83,11 +85,19 @@ runCommand
   .description("Run proxy server")
   .option("--port <port>", "Port of server", "4000")
   .option("--storage-dir <storageDir>", "Path storage dir")
-  .action(async ({ port, storageDir }) => {
+  .option("--change-host", "Change host in lock file (package-lock)")
+  .action(async ({ port, storageDir, changeHost }) => {
     const proxyServer = new ProxyServer({
       server: createServer(),
-      config: new ServerConfig({ storageDir }),
-      proxies: [{ url: "https://registry.npmjs.org", commands: ["install"] }],
+      storageDir: storageDir
+        ? path.resolve(process.cwd(), storageDir)
+        : undefined,
+      proxies: [
+        { url: "https://registry.npmjs.org", commands: ["install", "view"] },
+      ],
+      formatterPackageInfo: changeHost
+        ? ProxyServer.changeHostPackageInfo
+        : undefined,
     });
 
     proxyServer.server.addListener("listening", () => {

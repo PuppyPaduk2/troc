@@ -4,8 +4,11 @@ import * as fs from "fs/promises";
 import { accessSoft, readFileSoft } from "./fs";
 import { RequestMeta } from "./request-meta";
 import { ResponseMeta } from "./response-meta";
-import { ServerConfig } from "./server-config";
-import { NpmPackageInfo } from "./npm";
+import {
+  NpmPackageInfo,
+  NpmPackageInfoPublish,
+  NpmPackageInfoView,
+} from "./npm";
 
 export type RequestAdapterPaths = {
   tarball: {
@@ -18,22 +21,34 @@ export type RequestAdapterPaths = {
   };
 };
 
+export type FormatterPackageInfo<DataAdapter = unknown> = (
+  info: NpmPackageInfo | NpmPackageInfoView | NpmPackageInfoPublish,
+  adapter: RequestAdapter<DataAdapter>
+) => Promise<NpmPackageInfo>;
+
+export type RequestAdapterParams<DataAdapter = unknown> = {
+  req: RequestMeta;
+  res: ResponseMeta;
+  data: DataAdapter;
+  storageDir?: string;
+  formatterPackageInfo?: FormatterPackageInfo<DataAdapter>;
+};
+
 export class RequestAdapter<DataAdapter = unknown> {
   public req: RequestMeta;
   public res: ResponseMeta;
-  public config: ServerConfig = new ServerConfig();
   public data: DataAdapter;
+  public storageDir: string = RequestAdapter.storageDir;
+  public formatterPackageInfo: FormatterPackageInfo<DataAdapter> = (info) =>
+    Promise.resolve(info);
 
-  constructor(params: {
-    req: RequestMeta;
-    res: ResponseMeta;
-    config?: ServerConfig;
-    data: DataAdapter;
-  }) {
+  constructor(params: RequestAdapterParams<DataAdapter>) {
     this.req = params.req;
     this.res = params.res;
-    this.config = params.config ?? this.config;
     this.data = params.data;
+    this.storageDir = params.storageDir ?? this.storageDir;
+    this.formatterPackageInfo =
+      params.formatterPackageInfo ?? this.formatterPackageInfo;
   }
 
   // Tarball
@@ -84,15 +99,17 @@ export class RequestAdapter<DataAdapter = unknown> {
     return await fs.writeFile(file, data);
   }
 
+  // Props
   public get paths(): RequestAdapterPaths {
+    const registryDir = path.join(this.storageDir, "registry");
     const tarballDir = path.join(
-      this.config.registryDir,
+      registryDir,
       this.req.parsedUrl.dir,
       this.req.command === "publish" ? this.req.parsedUrl.base : "",
       this.req.command === "publish" ? "-" : ""
     );
     const infoDir = path.join(
-      this.config.registryDir,
+      registryDir,
       this.req.parsedUrl.dir,
       this.req.parsedUrl.base
     );
@@ -107,5 +124,10 @@ export class RequestAdapter<DataAdapter = unknown> {
         file: path.join(infoDir, "info.json"),
       },
     };
+  }
+
+  // Utils
+  static get storageDir(): string {
+    return path.join(__dirname, "storage");
   }
 }

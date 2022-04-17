@@ -1,5 +1,6 @@
 import * as fs from "fs/promises";
 import * as uuid from "uuid";
+import * as path from "path";
 
 import { readFileSoft } from "./fs";
 
@@ -41,10 +42,12 @@ export class JsonCache<Schema extends object> {
       raw += await JsonCache.toJson(data[index]);
     }
 
+    await fs.mkdir(path.parse(this.file).dir, { recursive: true });
     await fs.writeFile(this.file, raw);
   }
 
   public async writeRecord(id: RecordId, data: Schema): Promise<void> {
+    await fs.mkdir(path.parse(this.file).dir, { recursive: true });
     await fs.writeFile(this.file, await JsonCache.toJson([id, data]), {
       flag: "a",
     });
