@@ -4,10 +4,10 @@ import * as path from "path";
 import { RegistryServer } from "./registry-server";
 
 (async () => {
-  const port = 5000;
+  const port = 4000;
   const registryServer = new RegistryServer({
     server: createServer(),
-    storageDir: path.join(__dirname, "registry-storage"),
+    storageDir: path.join(__dirname, "reg"),
     // commandHandlers: {
     //   whoami: RegistryServer.createHandlerPipe([
     //     RegistryServer.log,

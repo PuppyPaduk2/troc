@@ -27,6 +27,12 @@ export type PackageDist = {
 
 export type PackageVersion = {
   dist: PackageDist;
+  _npmUser?: NpmUser;
+};
+
+export type NpmUser = {
+  name: string;
+  email: string;
 };
 
 export type NpmPackageInfo = {

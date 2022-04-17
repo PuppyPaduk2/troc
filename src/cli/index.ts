@@ -85,13 +85,19 @@ runCommand
   .description("Run proxy server")
   .option("--port <port>", "Port of server", "4000")
   .option("--storage-dir <storageDir>", "Path storage dir")
-  .action(async ({ port, storageDir }) => {
+  .option("--change-host", "Change host in lock file (package-lock)")
+  .action(async ({ port, storageDir, changeHost }) => {
     const proxyServer = new ProxyServer({
       server: createServer(),
       storageDir: storageDir
         ? path.resolve(process.cwd(), storageDir)
         : undefined,
-      proxies: [{ url: "https://registry.npmjs.org", commands: ["install"] }],
+      proxies: [
+        { url: "https://registry.npmjs.org", commands: ["install", "view"] },
+      ],
+      formatterPackageInfo: changeHost
+        ? ProxyServer.changeHostPackageInfo
+        : undefined,
     });
 
     proxyServer.server.addListener("listening", () => {

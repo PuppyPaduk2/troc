@@ -90,7 +90,7 @@ export class ProxyServer extends TrocServer {
       const { res } = await adapter.req.proxy(targetUrl, (options) => ({
         ...options,
         headers: {
-          ...removeProps(options.headers ?? {}, "accept-encoding"),
+          ...removeProps(options.headers ?? {}, "accept", "accept-encoding"),
           authorization: ProxyServer.getAuthorization(
             session?.registries[targetUrl]
           ),
@@ -256,7 +256,7 @@ export class ProxyServer extends TrocServer {
       const { res } = await adapter.req.proxy(targetUrl, (options) => ({
         ...options,
         headers: {
-          ...options.headers,
+          ...removeProps(options.headers ?? {}, "accept", "accept-encoding"),
           authorization: ProxyServer.getAuthorization(
             session?.registries[targetUrl]
           ),

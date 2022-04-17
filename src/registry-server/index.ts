@@ -98,6 +98,18 @@ export class RegistryServer extends TrocServer {
       await adapter.writeTarballFile(file, data);
     }
 
+    const tokenData = await adapter.data.tokens.get(adapter.req.token);
+    const userData = await adapter.data.users.get(tokenData?.username ?? "");
+
+    if (tokenData && userData) {
+      for (const [, version] of Object.entries(pkgInfo.versions)) {
+        version._npmUser = {
+          name: tokenData.username,
+          email: userData.email,
+        };
+      }
+    }
+
     const currInfo = await adapter.readInfoFileJson();
     const nextInfo: NpmPackageInfo = merge.recursive(
       currInfo,
