@@ -21,6 +21,9 @@ module.exports = ({ proxyServer, registryServer }) => ({
     },
     registryServer && {
       "run-registry-server": path.resolve(cwd, "./src/run-registry-server"),
+    },
+    {
+      run: path.resolve(cwd, "./src/server/run"),
     }
   ),
   module: {
@@ -59,6 +62,11 @@ module.exports = ({ proxyServer, registryServer }) => ({
         watch: path.resolve("./dist/run-registry-server.js"),
         delay: "200",
       }),
+    new NodemonPlugin({
+      script: "./dist/run.js",
+      watch: path.resolve("./dist/run.js"),
+      delay: "200",
+    }),
     new ShellPlugin("emit", "node ./scripts/after-build.js"),
     new ForkTsCheckerWebpackPlugin(),
   ].filter(Boolean),
