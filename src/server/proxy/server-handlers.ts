@@ -47,8 +47,6 @@ export const createServerHandlers = (options: Options = {}) => {
     const { command, apiParams } = adapter.request;
     let handler: AdapterHandler | null = null;
 
-    console.log(adapter.url);
-
     if (command) {
       handler = Adapter.getCommandHandler(command, {
         adduser: createPipe([
