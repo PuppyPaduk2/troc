@@ -7,17 +7,21 @@ import { createPipe } from "../create-pipe";
 import { ProxyMeta } from "../proxy-meta";
 import { RequestMeta } from "../request-meta";
 import { ResponseMeta } from "../response-meta";
-import { StorageMeta } from "../storage-meta";
+import { Registries, StorageMeta } from "../storage-meta";
 import { v1Signup } from "../common/api";
 import { adduser, install, logout, publish, view, whoami } from "./commands";
 
 export type Options = {
   storageDir?: string;
+  registries?: Registries;
 };
 
 export const createServerHandlers = (options: Options = {}) => {
-  const { storageDir = path.join(__dirname, "storage") } = options;
-  const storage = new StorageMeta({ storageDir });
+  const {
+    storageDir = path.join(__dirname, "storage"),
+    registries = { "": {} },
+  } = options;
+  const storage = new StorageMeta({ storageDir, registries });
   const proxy = new ProxyMeta();
   let reading: Promise<void> = Promise.resolve();
 

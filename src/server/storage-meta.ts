@@ -21,16 +21,24 @@ export type Data = {
   sessions: JsonCache<Sessions>;
 };
 
+// eslint-disable-next-line @typescript-eslint/ban-types
+export type Registry = {};
+
+export type Registries = Record<string, Registry>;
+
 type StorageParams = {
   storageDir: string;
+  registries: Registries;
 };
 
 export class StorageMeta {
   private storageDir: string;
+  private registries: Registries;
   public data: Data;
 
   constructor(params: StorageParams) {
     this.storageDir = params.storageDir;
+    this.registries = params.registries;
     this.data = {
       users: this.getJsonCache("users.json"),
       tokens: this.getJsonCache("tokens.json"),
@@ -40,6 +48,10 @@ export class StorageMeta {
 
   public get registryDir(): string {
     return path.join(this.storageDir, "registry");
+  }
+
+  public get registryPaths(): string[] {
+    return Object.keys(this.registries);
   }
 
   public async readData(): Promise<void> {

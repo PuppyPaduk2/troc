@@ -3,7 +3,7 @@ import * as http from "http";
 
 import { Adapter, AdapterHandler, AdapterHooks } from "../adapter";
 import { ProxyConfig, ProxyMeta } from "../proxy-meta";
-import { StorageMeta } from "../storage-meta";
+import { Registries, StorageMeta } from "../storage-meta";
 import { RequestMeta } from "../request-meta";
 import { ResponseMeta } from "../response-meta";
 import { createPipe } from "../create-pipe";
@@ -14,6 +14,7 @@ import { v1AttachToken } from "./api";
 
 export type Options = {
   storageDir?: string;
+  registries?: Registries;
   proxyConfigs?: ProxyConfig[];
   hooks?: Partial<AdapterHooks>;
 };
@@ -21,10 +22,11 @@ export type Options = {
 export const createServerHandlers = (options: Options = {}) => {
   const {
     storageDir = path.join(__dirname, "storage"),
+    registries = { "": {} },
     proxyConfigs = [],
     hooks,
   } = options;
-  const storage = new StorageMeta({ storageDir });
+  const storage = new StorageMeta({ storageDir, registries });
   const proxy = new ProxyMeta(proxyConfigs);
   let reading: Promise<void> = Promise.resolve();
 
@@ -44,6 +46,8 @@ export const createServerHandlers = (options: Options = {}) => {
     });
     const { command, apiParams } = adapter.request;
     let handler: AdapterHandler | null = null;
+
+    console.log(adapter.url);
 
     if (command) {
       handler = Adapter.getCommandHandler(command, {

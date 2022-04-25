@@ -17,6 +17,10 @@ registryServer.listen(registryPort);
 const proxyPort = 4000;
 const proxyServer = createHttpServer({
   storageDir: path.join(__dirname, "storage-proxy"),
+  registries: {
+    "/protected": {},
+    "": {},
+  },
   proxyConfigs: [
     {
       url: "http://0.0.0.0:5000",

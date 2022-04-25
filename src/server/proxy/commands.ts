@@ -9,10 +9,10 @@ import { createPipe } from "../create-pipe";
 
 export const install = createPipe([
   async (adapter) => {
-    if (adapter.request.url?.startsWith("/-")) await adapter.response.sendOk();
+    if (adapter.url?.startsWith("/-")) await adapter.response.sendOk();
   },
   async (adapter) => {
-    if (adapter.request.urlPath.ext) await getTarball(adapter);
+    if (adapter.urlPath.ext) await getTarball(adapter);
   },
   async (adapter) => {
     await getInfo(adapter);
@@ -35,7 +35,7 @@ const getTarball = createPipe([
         ...options,
         headers: { ...options.headers, authorization },
       });
-      const { res } = await adapter.request.proxyRequest(targetUrl, formatter);
+      const { res } = await adapter.proxyRequest(targetUrl, formatter);
 
       if (res && res.isSuccess) {
         const data = await res.data();
@@ -61,7 +61,7 @@ const getInfo = createPipe([
           authorization,
         },
       });
-      const { res } = await adapter.request.proxyRequest(targetUrl, formatter);
+      const { res } = await adapter.proxyRequest(targetUrl, formatter);
 
       if (res && res.isSuccess) {
         const info = await res.json<NpmPackageInfoInstall | null>(null);
@@ -150,7 +150,7 @@ export const publish = createPipe([
           authorization,
         },
       });
-      const { res } = await adapter.request.proxyRequest(targetUrl, formatter);
+      const { res } = await adapter.proxyRequest(targetUrl, formatter);
 
       if (res && res.isSuccess) {
         await adapter.response.sendOk({ end: await res.data() });

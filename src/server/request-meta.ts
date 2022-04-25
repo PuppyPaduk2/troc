@@ -1,16 +1,9 @@
 import * as path from "path";
 import * as url from "url";
 import * as http from "http";
+import * as https from "https";
 
-import {
-  getIncomingMessageData,
-  proxyRequest,
-  RequestOptionsFormatter,
-} from "../utils/request";
-
-type Options = {
-  url?: string;
-};
+import { removeProps } from "../utils/object";
 
 export type ApiParams = {
   version: string;
@@ -23,18 +16,23 @@ export type Pkg = {
   name: string;
 };
 
+export type RequestOptionsFormatter = (
+  options: http.RequestOptions,
+  extra: {
+    parsedTargetUrl: URL;
+  }
+) => http.RequestOptions;
+
 export class RequestMeta {
   private original: http.IncomingMessage;
-  private options: Options = {};
   private _data: Buffer | null = null;
 
-  constructor(request: http.IncomingMessage, options?: Options) {
+  constructor(request: http.IncomingMessage) {
     this.original = request;
-    this.options = options ?? this.options;
   }
 
   public get url(): string {
-    return decodeURIComponent(this.options.url ?? this.original.url ?? "");
+    return decodeURIComponent(this.original.url ?? "");
   }
 
   public get urlPath(): path.ParsedPath {
@@ -80,7 +78,7 @@ export class RequestMeta {
   }
 
   public get pkg(): Pkg {
-    let result = this.url.match(/^\/([\w-]*)\/([\w-]*)(\/|$)/) ?? [];
+    let result = this.url.match(/^\/([\w\d-_]*)\/([\w\d-_]*)(\/|$)/) ?? [];
 
     if (result.length) {
       const scope = (result[2] !== "-" ? result[1] : "") || "";
@@ -103,8 +101,18 @@ export class RequestMeta {
     return status >= 200 && status < 300;
   }
 
+  public get repoPath(): string {
+    const url = this.url;
+    const expWithScope = /^(.*)(\/@[\w\d-_]*)(\/[\w\d-_]*)$/;
+    const expWithoutScope = /^(.*)(\/[\w\d-_]*)$/;
+    const matchedUrl = url.match(expWithScope) || url.match(expWithoutScope);
+
+    return matchedUrl ? matchedUrl[1] ?? "" : "";
+  }
+
   public async data(): Promise<Buffer> {
-    this._data = this._data ?? (await getIncomingMessageData(this.original));
+    this._data =
+      this._data ?? (await RequestMeta.getIncomingMessageData(this.original));
     return this._data;
   }
 
@@ -118,11 +126,24 @@ export class RequestMeta {
 
   public async proxyRequest(
     targetUrl: string,
-    formatter?: RequestOptionsFormatter
+    formatter: RequestOptionsFormatter = (options) => options
   ): Promise<{ req: http.ClientRequest; res?: RequestMeta }> {
-    const request = proxyRequest(this.original, targetUrl)(formatter);
-    const data = await this.data();
-    const { req, res } = await request(data);
+    const { req, res } = await RequestMeta.proxyRequest({
+      req: this.original,
+      data: await this.data(),
+      formatter: (options, extra) =>
+        formatter(
+          {
+            ...options,
+            headers: options.headers
+              ? removeProps(options.headers, "host")
+              : undefined,
+            path: path.join(extra.parsedTargetUrl.pathname, this.url),
+          },
+          extra
+        ),
+      targetUrl,
+    });
     const resMeta = res ? new RequestMeta(res) : undefined;
     return { req, res: resMeta };
   }
@@ -130,5 +151,79 @@ export class RequestMeta {
   static getHeader(value?: string | string[]): string {
     if (Array.isArray(value)) return value[0] ?? "";
     return value ?? "";
+  }
+
+  static proxyRequest(params: {
+    req: http.IncomingMessage;
+    targetUrl: string;
+    formatter?: RequestOptionsFormatter;
+    data?: Buffer;
+  }) {
+    const {
+      req,
+      targetUrl,
+      formatter = (options) => options,
+      data = Buffer.from([]),
+    } = params;
+    const parsedTargetUrl = new URL(targetUrl);
+    const options = formatter(
+      {
+        protocol: parsedTargetUrl.protocol || undefined,
+        hostname: parsedTargetUrl.hostname || undefined,
+        port: parsedTargetUrl.port || undefined,
+        method: req?.method ?? "GET",
+        headers: req.headers || undefined,
+        path: parsedTargetUrl.pathname || undefined,
+      },
+      { parsedTargetUrl }
+    );
+    const request = RequestMeta.getRequest(options.protocol ?? "http:");
+
+    return new Promise<{
+      req: http.ClientRequest;
+      res?: http.IncomingMessage;
+    }>((resolve) => {
+      const reqProxy = request(options);
+
+      if (data) {
+        reqProxy.write(data, "utf8");
+      }
+
+      reqProxy.on("response", (resProxy) => {
+        resolve({ req: reqProxy, res: resProxy });
+      });
+      reqProxy.on("error", () => {
+        resolve({ req: reqProxy });
+      });
+      reqProxy.end();
+    });
+  }
+
+  static getRequest(protocol: string) {
+    if (protocol === "http:") {
+      return http.request;
+    } else if (protocol === "https:") {
+      return https.request;
+    }
+
+    throw new Error("Incorrect request type");
+  }
+
+  static getIncomingMessageData(req: http.IncomingMessage): Promise<Buffer> {
+    return new Promise((resolve) => {
+      const data: Buffer[] = [];
+
+      req.on("data", (chunk: Buffer) => {
+        data.push(chunk);
+      });
+
+      req.on("end", () => {
+        resolve(Buffer.concat(data));
+      });
+
+      req.on("error", () => {
+        resolve(Buffer.from([]));
+      });
+    });
   }
 }

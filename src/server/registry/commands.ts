@@ -15,10 +15,10 @@ import { createPipe } from "../create-pipe";
 
 export const install: AdapterHandler = createPipe([
   async (adapter) => {
-    if (adapter.request.url?.startsWith("/-")) await adapter.response.sendOk();
+    if (adapter.url?.startsWith("/-")) await adapter.response.sendOk();
   },
   async (adapter) => {
-    if (adapter.request.urlPath.ext) await getTarball(adapter);
+    if (adapter.urlPath.ext) await getTarball(adapter);
   },
   async (adapter) => {
     await getInfo(adapter);

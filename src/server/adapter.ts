@@ -6,7 +6,11 @@ import {
 } from "../utils/npm";
 
 import { ProxyMeta } from "./proxy-meta";
-import { ApiParams, RequestMeta } from "./request-meta";
+import {
+  ApiParams,
+  RequestMeta,
+  RequestOptionsFormatter,
+} from "./request-meta";
 import { ResponseMeta } from "./response-meta";
 import { StorageMeta } from "./storage-meta";
 
@@ -84,6 +88,18 @@ export class Adapter {
     return this.getAuthorization(this.request.token);
   }
 
+  public get url(): string {
+    const url = this.request.url;
+    const registryPaths = this.storage.registryPaths;
+    const regExp = new RegExp(`^(${registryPaths.join("|")})`);
+
+    return url.replace(regExp, "");
+  }
+
+  public get urlPath(): path.ParsedPath {
+    return path.parse(this.url);
+  }
+
   public getAuthorization(token?: string): string {
     if (!token) return "";
     return `Bearer ${token}`;
@@ -94,6 +110,21 @@ export class Adapter {
     const session = await sessions.get(this.request.token);
     const sessionToken = session?.registries[targetUrl];
     return this.getAuthorization(sessionToken);
+  }
+
+  public async proxyRequest(
+    targetUrl: string,
+    formatter: RequestOptionsFormatter = (options) => options
+  ) {
+    return this.request.proxyRequest(targetUrl, (options, extra) =>
+      formatter(
+        {
+          ...options,
+          path: path.join(extra.parsedTargetUrl.pathname, this.url),
+        },
+        extra
+      )
+    );
   }
 
   static getCommandHandler(
