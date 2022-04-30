@@ -9,14 +9,14 @@ import { RegistryServer } from "../registry-server";
 import { ProxyServer } from "../proxy-server";
 
 program
-  .command("signup <username> <password> <email>")
+  .command("signup <name> <password> <email>")
   .description("Signup to registry on troc-server")
   .option("--registry <registryUrl>", "Registry url")
-  .action(async (username, password, email, { registry }) => {
-    const href = await getFetchHref("/api/v1/signup", registry);
+  .action(async (name, password, email, { registry }) => {
+    const href = await getFetchHref("/v1/signup", registry);
     const res = await fetch(href, {
       method: "POST",
-      body: JSON.stringify({ username, password, email }),
+      body: JSON.stringify({ name, password, email }),
     });
 
     if (isSuccessful(res)) {
@@ -39,7 +39,7 @@ program
     }
 
     const registryUrl = await getNpmRegistryUrl(registry);
-    const href = await getFetchHref("/api/v1/attach-token", registryUrl.href);
+    const href = await getFetchHref("/v1/attach-token", registryUrl.href);
     const configRegistry = await getRegistryConfig(registryUrl.href);
     const res = await fetch(href, {
       method: "POST",
@@ -115,7 +115,7 @@ async function getFetchHref(
 ): Promise<string> {
   const registryUrl = await getNpmRegistryUrl(registry);
 
-  registryUrl.pathname = pathname;
+  registryUrl.pathname = path.join("/api", registryUrl.pathname, pathname);
   return registryUrl.href;
 }
 
