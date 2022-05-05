@@ -103,6 +103,7 @@ export class Request {
   }
 
   public get pkgName(): string {
+    if (this._npmTarballWithoutScope) return this._npmTarballWithoutScope[3];
     if (this._npmPkgWithScope) return this._npmPkgWithScope[5];
     if (this._npmPkgWithoutScope) return this._npmPkgWithoutScope[3];
     return "";
@@ -159,7 +160,7 @@ export class Request {
   static expNpmPkgWithoutScope = /^(.*)(\/([\w\d-_]*))$/;
   static extNpmTarballWithScope =
     /^(.*)(\/(@[\w\d-_]*))(\/[\w\d-_]*\/-)(\/.*\.tgz)$/;
-  static extNpmTarballWithoutScope = /^(.*)(\/[\w\d-_]*\/-)(\/.*\.tgz)$/;
+  static extNpmTarballWithoutScope = /^(.*)(\/([\w\d-_]*)\/-)(\/.*\.tgz)$/;
   static expApi = /^\/api(\/.*)?(\/v\d*)(\/.+)/;
 
   static getHeader(value?: string | string[]): string {
@@ -217,8 +218,6 @@ export class Request {
     }>((resolve) => {
       const reqProxy = request(options);
 
-      console.log("XXX", options);
-
       if (data) {
         reqProxy.write(data, "utf8");
       }
@@ -228,15 +227,6 @@ export class Request {
       });
       reqProxy.on("error", () => {
         resolve({ req: reqProxy });
-      });
-      reqProxy.on("connect", () => {
-        console.log("connect");
-      });
-      reqProxy.on("socket", () => {
-        console.log("socket");
-      });
-      reqProxy.on("pipe", () => {
-        console.log("pipe");
       });
       reqProxy.end();
     });
