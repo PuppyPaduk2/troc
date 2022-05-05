@@ -8,21 +8,14 @@ const ShellPlugin = require("./utils/shell-plugin");
 
 const cwd = process.cwd();
 
-module.exports = ({ proxyServer, registryServer }) => ({
+module.exports = () => ({
   mode: "development",
   target: "node",
   devtool: "source-map",
-  entry: Object.assign(
-    {
-      cli: path.resolve(cwd, "./src/cli"),
-    },
-    proxyServer && {
-      "run-proxy-server": path.resolve(cwd, "./src/run-proxy-server"),
-    },
-    registryServer && {
-      "run-registry-server": path.resolve(cwd, "./src/run-registry-server"),
-    }
-  ),
+  entry: Object.assign({
+    cli: path.resolve(cwd, "./src/cli"),
+    run: path.resolve(cwd, "./src/server/run"),
+  }),
   module: {
     rules: [
       {
@@ -47,18 +40,11 @@ module.exports = ({ proxyServer, registryServer }) => ({
     aggregateTimeout: 100,
   },
   plugins: [
-    proxyServer &&
-      new NodemonPlugin({
-        script: "./dist/run-proxy-server.js",
-        watch: path.resolve("./dist/run-proxy-server.js"),
-        delay: "200",
-      }),
-    registryServer &&
-      new NodemonPlugin({
-        script: "./dist/run-registry-server.js",
-        watch: path.resolve("./dist/run-registry-server.js"),
-        delay: "200",
-      }),
+    new NodemonPlugin({
+      script: "./dist/run.js",
+      watch: path.resolve("./dist/run.js"),
+      delay: "200",
+    }),
     new ShellPlugin("emit", "node ./scripts/after-build.js"),
     new ForkTsCheckerWebpackPlugin(),
   ].filter(Boolean),

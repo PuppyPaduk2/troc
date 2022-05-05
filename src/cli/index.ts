@@ -1,22 +1,19 @@
 import { program } from "commander";
-import { createServer } from "http";
 import * as path from "path";
 
 import { version } from "../../package.json";
 import { getNpmConfigValue, getRegistryConfig } from "../utils/npm";
 import { fetch, Response } from "../utils/fetch";
-import { RegistryServer } from "../registry-server";
-import { ProxyServer } from "../proxy-server";
 
 program
-  .command("signup <username> <password> <email>")
+  .command("signup <name> <password> <email>")
   .description("Signup to registry on troc-server")
   .option("--registry <registryUrl>", "Registry url")
-  .action(async (username, password, email, { registry }) => {
-    const href = await getFetchHref("/api/v1/signup", registry);
+  .action(async (name, password, email, { registry }) => {
+    const href = await getFetchHref("/v1/signup", registry);
     const res = await fetch(href, {
       method: "POST",
-      body: JSON.stringify({ username, password, email }),
+      body: JSON.stringify({ name, password, email }),
     });
 
     if (isSuccessful(res)) {
@@ -39,7 +36,7 @@ program
     }
 
     const registryUrl = await getNpmRegistryUrl(registry);
-    const href = await getFetchHref("/api/v1/attach-token", registryUrl.href);
+    const href = await getFetchHref("/v1/attach-token", registryUrl.href);
     const configRegistry = await getRegistryConfig(registryUrl.href);
     const res = await fetch(href, {
       method: "POST",
@@ -59,53 +56,6 @@ program
     }
   });
 
-const runCommand = program.command("run");
-
-runCommand
-  .command("registry")
-  .description("Run registry server")
-  .option("--port <port>", "Port of server", "4000")
-  .option("--storage-dir <storageDir>", "Path storage dir")
-  .action(async ({ port, storageDir }) => {
-    const registryServer = new RegistryServer({
-      server: createServer(),
-      storageDir: storageDir
-        ? path.resolve(process.cwd(), storageDir)
-        : undefined,
-    });
-
-    registryServer.server.addListener("listening", () => {
-      console.log(`Server started http://localhost:${port}`);
-    });
-    registryServer.server.listen(port);
-  });
-
-runCommand
-  .command("proxy")
-  .description("Run proxy server")
-  .option("--port <port>", "Port of server", "4000")
-  .option("--storage-dir <storageDir>", "Path storage dir")
-  .option("--change-host", "Change host in lock file (package-lock)")
-  .action(async ({ port, storageDir, changeHost }) => {
-    const proxyServer = new ProxyServer({
-      server: createServer(),
-      storageDir: storageDir
-        ? path.resolve(process.cwd(), storageDir)
-        : undefined,
-      proxies: [
-        { url: "https://registry.npmjs.org", commands: ["install", "view"] },
-      ],
-      formatterPackageInfo: changeHost
-        ? ProxyServer.changeHostPackageInfo
-        : undefined,
-    });
-
-    proxyServer.server.addListener("listening", () => {
-      console.log(`Server started http://localhost:${port}`);
-    });
-    proxyServer.server.listen(port);
-  });
-
 program.version(version).parse(process.argv);
 
 // Utils
@@ -115,7 +65,7 @@ async function getFetchHref(
 ): Promise<string> {
   const registryUrl = await getNpmRegistryUrl(registry);
 
-  registryUrl.pathname = pathname;
+  registryUrl.pathname = path.join("/api", registryUrl.pathname, pathname);
   return registryUrl.href;
 }
 
