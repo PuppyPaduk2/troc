@@ -6,9 +6,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "webpack",
-    "start": "webpack --watch",
-    "start:proxy-server": "webpack --watch --env proxyServer",
-    "start:registry-server": "webpack --watch --env registryServer"
+    "start": "webpack --watch"
   },
   "author": "",
   "license": "ISC",
