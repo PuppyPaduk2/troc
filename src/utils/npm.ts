@@ -45,8 +45,18 @@ export type NpmPackageInfoInstall = NpmResponse & NpmPackageInfo;
 
 export type NpmPackageInfoPublish = NpmResponse &
   NpmPackageInfo & {
-    _attachments: Record<string, { data: string }>;
+    _attachments: Record<string, NpmPackageAttachment>;
   };
+
+export type NpmPackageAttachment = {
+  data: string;
+};
+
+export type NpmPackageInfoFull =
+  | NpmPackageInfo
+  | NpmPackageInfoInstall
+  | NpmPackageInfoView
+  | NpmPackageInfoPublish;
 
 export type RegistryConfig = Record<string, string> & {
   _authToken?: string;
