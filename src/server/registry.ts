@@ -6,7 +6,7 @@ import * as merge from "merge";
 import { accessSoft, readFileSoft, readJson } from "../utils/fs";
 import { NpmPackageInfo, NpmPackageInfoFull } from "../utils/npm";
 import { RegistryCache } from "./registry-cache";
-import { RequestNext } from "./request-next";
+import { RequestNext } from "./request";
 import { removeProps } from "../utils/object";
 
 export type RegistryUrl = string;

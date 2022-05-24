@@ -1,7 +1,5 @@
 import * as http from "http";
-// import { Adapter } from "./adapter";
-// import { Registry, RegistryUrl } from "./registry";
-import { RegistryNext, RegistryUrl } from "./registry-next";
+import { RegistryNext, RegistryUrl } from "./registry";
 
 import { createServerHandlers } from "./server-handlers";
 

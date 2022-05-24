@@ -1,5 +1,5 @@
 import { hmac } from "../../utils/crypto";
-import { AdapterNext } from "../adapter-next";
+import { AdapterNext } from "../adapter";
 import { AdapterHandler } from "./types";
 
 export const signup: AdapterHandler = async (adapter) => {

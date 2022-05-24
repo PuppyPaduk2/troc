@@ -1,9 +1,8 @@
 import * as path from "path";
-// import { Adapter } from "./adapter";
 import { formatPackageInfo } from "./hooks/next";
 
 import { createHttpServer as createHttpServerRoot } from "./http-server";
-import { RegistryNext, RegistryParams } from "./registry-next";
+import { RegistryNext, RegistryParams } from "./registry";
 
 const proxyPort = 4000;
 const dir = path.join(__dirname, "storage-root");

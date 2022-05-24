@@ -7,8 +7,8 @@ import {
   NpmPackageInfoPublish,
 } from "../utils/npm";
 import { SessionData, Token, TokenData, UserData } from "./registry-cache";
-import { RegistryHooks, RegistryNext, RegistryUrl } from "./registry-next";
-import { RequestNext, RequestOptionsFormatter } from "./request-next";
+import { RegistryHooks, RegistryNext, RegistryUrl } from "./registry";
+import { RequestNext, RequestOptionsFormatter } from "./request";
 import { removeProps, removePropsEmpty } from "../utils/object";
 import { Response } from "./response";
 import { generateToken, hmac } from "../utils/crypto";

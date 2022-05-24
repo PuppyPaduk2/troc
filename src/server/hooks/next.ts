@@ -1,4 +1,4 @@
-import { RegistryHooks } from "../registry-next";
+import { RegistryHooks } from "../registry";
 
 export const formatPackageInfo: RegistryHooks["formatPackageInfo"] = async (
   info,

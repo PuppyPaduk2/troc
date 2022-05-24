@@ -1,10 +1,10 @@
 import * as http from "http";
 
-import { handleRequest } from "./handlers-next";
+import { handleRequest } from "./handlers";
 import { Response } from "./response";
-import { RequestNext } from "./request-next";
-import { AdapterNext } from "./adapter-next";
-import { RegistryNext, RegistryUrl } from "./registry-next";
+import { RequestNext } from "./request";
+import { AdapterNext } from "./adapter";
+import { RegistryNext, RegistryUrl } from "./registry";
 import { Logger } from "./logger";
 
 export const createServerHandlers = (options: {

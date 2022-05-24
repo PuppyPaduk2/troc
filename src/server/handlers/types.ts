@@ -1,6 +1,6 @@
 import { MatchFunction } from "path-to-regexp";
 
-import { AdapterNext } from "../adapter-next";
+import { AdapterNext } from "../adapter";
 
 export type AdapterHandler<Result = void> = (
   adapter: AdapterNext
