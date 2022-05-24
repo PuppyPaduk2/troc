@@ -1,12 +1,14 @@
 import * as http from "http";
-import { Adapter } from "./adapter";
-import { handleRequest } from "./handlers";
-import { Registry, RegistryUrl } from "./registry";
-import { Request } from "./request";
+
+import { handleRequest } from "./handlers-next";
 import { Response } from "./response";
+import { RequestNext } from "./request-next";
+import { AdapterNext } from "./adapter-next";
+import { RegistryNext, RegistryUrl } from "./registry-next";
+import { Logger } from "./logger";
 
 export const createServerHandlers = (options: {
-  registries: Map<RegistryUrl, Registry<Adapter>>;
+  registries: Map<RegistryUrl, RegistryNext>;
 }) => {
   const { registries } = options;
 
@@ -15,34 +17,17 @@ export const createServerHandlers = (options: {
   };
 
   const request: http.RequestListener = async (req, res) => {
-    const request = new Request(req);
+    const request = new RequestNext(req);
     const response = new Response(res);
-    const adapter = new Adapter({ request, response, registries });
+    const logger = new Logger();
+    const adapter = new AdapterNext({ request, response, registries, logger });
 
-    console.log("request >");
-    console.log("         ", "method:          ", request.method);
-    console.log("         ", "url:             ", request.url.href);
-    console.log(
-      "         ",
-      "registryUrl:     ",
-      request.registryUrl.slice(-48)
-    );
-    console.log("         ", "apiVersion:      ", request.apiVersion);
-    console.log("         ", "apiPath:         ", request.apiPath);
-    console.log(
-      "         ",
-      "registryDir:     ",
-      adapter.registry?.dir.slice(-48)
-    );
-    console.log("         ", "registry.isProxy:", adapter.registry?.isProxy);
-    console.log("         ", "token:           ", request.token.slice(-48));
-    console.log("         ", "isCorrectToken:  ", await adapter.isCorrectToken);
-    console.log("         ", "npmCommand:      ", request.npmCommand);
-    console.log("         ", "pkgScope:        ", request.pkgScope);
-    console.log("         ", "pkgName:         ", request.pkgName);
-    console.log();
-
+    await logger.addHeader("REQUEST");
+    await logger.addValue("url", request.url.value);
+    await logger.addValue("registryUrl", request.url.registry ?? "");
     await handleRequest(adapter);
+    await adapter.response.sendBadRequest();
+    await logger.log();
   };
 
   return { listening, request };

@@ -36,6 +36,7 @@ export type NpmUser = {
 };
 
 export type NpmPackageInfo = {
+  name: string;
   versions: Record<string, PackageVersion>;
 };
 
@@ -66,7 +67,7 @@ export async function getRegistryConfig(
   registryUrl: string | URL,
   configFiles?: string[]
 ): Promise<RegistryConfig> {
-  const { host } =
+  const { host, pathname } =
     registryUrl instanceof URL ? registryUrl : new URL(registryUrl);
   const files = configFiles ?? [
     path.join(process.cwd(), ".npmrc"),
@@ -76,7 +77,7 @@ export async function getRegistryConfig(
   const data = await Promise.all(files.reverse().map(readFileSoft));
   const lines = Buffer.concat(data).toString().trim().split("\n");
   const entries = lines
-    .map((line) => line.match(getRegistryRegExp(host)) ?? [])
+    .map((line) => line.match(getRegistryRegExp(host + pathname)) ?? [])
     .filter((item) => item.length)
     .map(([, key, value]) => [key, value]);
 
@@ -99,5 +100,5 @@ export async function getNpmConfigValue(
 }
 
 function getRegistryRegExp(host: string): RegExp {
-  return new RegExp(`^//${host}/:([\\w_-]*)=(.*)`);
+  return new RegExp(`^//${host.replace(/\/+$/, "")}/:([\\w\\d_-]*)=(.*)`);
 }

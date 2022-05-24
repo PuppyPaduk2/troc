@@ -194,6 +194,7 @@ const publishLocal = async (adapter: Adapter): Promise<void> => {
 
 const getPkgInfo = async (adapter: Adapter): Promise<NpmPackageInfoPublish> => {
   return await adapter.req.json<NpmPackageInfoPublish>({
+    name: "",
     versions: {},
     _attachments: {},
   });
@@ -221,5 +222,10 @@ const addNpmUser = async (
 };
 
 const readPkgInfo = async (adapter: Adapter): Promise<NpmPackageInfo> => {
-  return (await readJson<NpmPackageInfo>(adapter.infoFile)) ?? { versions: {} };
+  return (
+    (await readJson<NpmPackageInfo>(adapter.infoFile)) ?? {
+      name: "",
+      versions: {},
+    }
+  );
 };
