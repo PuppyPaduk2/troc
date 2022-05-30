@@ -5,6 +5,7 @@ import * as apiV1 from "./api-v1";
 import * as npmCommands from "./npm-commands";
 
 export const handleRequest: AdapterHandler = async (adapter) => {
+  await adapter.logger.addTitle("handleRequest");
   if (!adapter.registry) await adapter.response.sendBadRequest();
   else if (adapter.request.headers.npmCommand) await handleNpmCommand(adapter);
   else if (adapter.request.url.npmApiVersion) await handleNpmApi(adapter);
@@ -29,6 +30,7 @@ const npmCommandHandlers = toAdapterHandlers({
 });
 
 const handleNpmCommand: AdapterHandler = async (adapter) => {
+  await adapter.logger.addTitle("handleNpmCommand");
   const npmCommand = adapter.request.headers.npmCommand ?? "";
   const [, handler] =
     npmCommandHandlers.find(([match]) => match(npmCommand)) ?? [];
@@ -40,6 +42,7 @@ const npmApiHandlers = toAdapterHandlers({
 });
 
 const handleNpmApi: AdapterHandler = async (adapter) => {
+  await adapter.logger.addTitle("handleNpmApi");
   const { url } = adapter.request;
   const key = (url.npmApiVersion ?? "") + (url.npmApiPath ?? "");
   const [, handler] = npmApiHandlers.find(([match]) => match(key)) ?? [];
@@ -52,6 +55,7 @@ const trocApiHandlers = toAdapterHandlers({
 });
 
 const handleTrocApi: AdapterHandler = async (adapter) => {
+  await adapter.logger.addTitle("handleTrocApi");
   const { url } = adapter.request;
   const key = (url.trocApiVersion ?? "") + (url.trocApiPath ?? "");
   const [, handler] = trocApiHandlers.find(([match]) => match(key)) ?? [];

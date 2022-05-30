@@ -5,38 +5,53 @@ import { RequestData } from "../request-data";
 import { AdapterHandler } from "./types";
 
 export const adduser: AdapterHandler = async (adapter) => {
+  await adapter.logger.addTitle("adduser");
+  await adapter.logger.addBlock("checkRegistry");
   if (!adapter.registry) return await adapter.response.sendBadRequest();
 
+  await adapter.logger.addBlock("getDataUser");
   const data = await adapter.getDataAdduser();
   if (!data) return await adapter.response.sendBadRequest();
 
+  await adapter.logger.addBlock("checkPassword");
   const { password, name } = data;
   const isCorrectPassword = await adapter.isCorrectPassword(password, name);
   if (!isCorrectPassword) return await adapter.response.sendBadRequest();
 
+  await adapter.logger.addBlock("send");
   const token = await adapter.createToken({ username: data.name });
   await adapter.response.sendOk({ end: JSON.stringify({ token }) });
 };
 
 export const whoami: AdapterHandler = async (adapter) => {
+  await adapter.logger.addTitle("whoami");
+  await adapter.logger.addBlock("checkTokenData");
   const tokenData = await adapter.getTokenData();
   if (!tokenData) return await adapter.response.sendUnauthorized();
 
+  await adapter.logger.addBlock("send");
   const end = JSON.stringify({ username: tokenData.username });
   await adapter.response.sendOk({ end });
 };
 
 export const logout: AdapterHandler = async (adapter) => {
+  await adapter.logger.addTitle("logout");
+  await adapter.logger.addBlock("checkToken");
   if (!adapter.token) return await adapter.response.sendOk();
 
+  await adapter.logger.addBlock("removeData");
   await adapter.registry?.cache.removeToken(adapter.token);
   await adapter.registry?.cache.removeSession(adapter.token);
+  await adapter.logger.addBlock("send");
   await adapter.response.sendOk();
 };
 
 export const publish: AdapterHandler = async (adapter) => {
+  await adapter.logger.addTitle("publish");
+  await adapter.logger.addBlock("checkRegistry");
   if (!adapter.registry) return await adapter.response.sendNotFound();
 
+  await adapter.logger.addBlock("checkToken");
   const isCorrectToken = await adapter.isCorrectToken();
   if (!isCorrectToken) return await adapter.response.sendUnauthorized();
 
@@ -45,30 +60,40 @@ export const publish: AdapterHandler = async (adapter) => {
 };
 
 const publishProxy: AdapterHandler = async (adapter) => {
+  await adapter.logger.addTitle("publishProxy");
+  await adapter.logger.addBlock("proxyRequest");
   const result = await adapter.proxy();
+  await adapter.logger.addBlock("checkProxyResponse");
   if (!result?.res) return await adapter.response.sendBadRequest();
 
+  await adapter.logger.addBlock("checkProxyAuth");
   if (result.res.statusCode === 401) {
     return await adapter.response.sendUnauthorized();
   }
 
+  await adapter.logger.addBlock("checkProxySuccess");
   if (!result.res.isSuccess) {
     return await adapter.response.send({
       statusCode: result.res.statusCode ?? 404,
     });
   }
 
+  await adapter.logger.addBlock("send");
   const end = await result.res.data.value();
   await adapter.response.sendOk({ end });
 };
 
 const publishLocal: AdapterHandler = async (adapter) => {
+  await adapter.logger.addHeader("publishLocal");
+  await adapter.logger.addBlock("checkRegistry");
   const { registry } = adapter;
   if (!registry) return adapter.response.sendBadRequest();
 
+  await adapter.logger.addBlock("checkPkgInfo");
   const pkgInfo = await adapter.getPkgInfo();
   if (!pkgInfo) return await adapter.response.sendBadRequest();
 
+  await adapter.logger.addBlock("checkTarballs");
   const expPkgScope = /^(@[\w\d_\-.]+)\/([\w\d_\-.]+)$/;
   const matchResultPkgScope = pkgInfo.name.match(expPkgScope);
   const pkgScope = matchResultPkgScope ? matchResultPkgScope[1] ?? null : null;
@@ -83,6 +108,7 @@ const publishLocal: AdapterHandler = async (adapter) => {
   const isIncorrect = !accessingResult.filter(isFalse).length;
   if (isIncorrect) return await adapter.response.sendBadRequest();
 
+  await adapter.logger.addBlock("changeTarballDist");
   const registryUrl = adapter.request.url.registry ?? "";
   versions.forEach(([tarballVersion, data]) => {
     const { host = "" } = adapter.request.headers;
@@ -91,6 +117,7 @@ const publishLocal: AdapterHandler = async (adapter) => {
     const pathname = path.join(registryUrl, tarballPathname);
     data.dist.tarball = "http://" + host + pathname;
   });
+  await adapter.logger.addBlock("writing");
   const attachmentKeys = versionKeys.map((version) => {
     return path.join(pkgScope ?? "", pkgName) + "-" + version + ".tgz";
   });
@@ -104,12 +131,16 @@ const publishLocal: AdapterHandler = async (adapter) => {
   const mergeParams = { pkgScope, pkgName, pkgInfo };
   const nextPkgInfo = await registry.mergePkgInfo(mergeParams);
   await registry.writePkgInfo({ pkgScope, pkgName, pkgInfo: nextPkgInfo });
+  await adapter.logger.addBlock("send");
   await adapter.response.sendOk();
 };
 
 export const view: AdapterHandler = async (adapter) => {
+  await adapter.logger.addHeader("view");
+  await adapter.logger.addBlock("checkRegistry");
   if (!adapter.registry) return await adapter.response.sendNotFound();
 
+  await adapter.logger.addBlock("checkToken");
   const isCorrectToken = await adapter.isCorrectToken();
   if (!isCorrectToken) return await adapter.response.sendUnauthorized();
 
@@ -118,82 +149,92 @@ export const view: AdapterHandler = async (adapter) => {
 };
 
 const viewProxy: AdapterHandler = async (adapter) => {
+  await adapter.logger.addHeader("viewProxy");
+  await adapter.logger.addBlock("proxyRequest");
   const result = await adapter.proxy();
+  await adapter.logger.addBlock("checkProxyResponse");
   if (!result?.res) return await adapter.response.sendNotFound();
 
+  await adapter.logger.addBlock("checkProxyAuth");
   if (result.res.statusCode === 401) {
     return await adapter.response.sendUnauthorized();
   }
 
+  await adapter.logger.addBlock("checkProxySuccess");
   if (!result.res.isSuccess) {
     return await adapter.response.send({
       statusCode: result.res.statusCode ?? 404,
     });
   }
 
+  await adapter.logger.addBlock("send");
   const end = await result.res.data.value();
   await adapter.response.sendOk({ end });
 };
 
 const viewLocal: AdapterHandler = async (adapter) => {
+  await adapter.logger.addHeader("viewLocal");
+  await adapter.logger.addBlock("checkRegistry");
   const { registry } = adapter;
   if (!registry) return await adapter.response.sendBadRequest();
 
+  await adapter.logger.addBlock("checkPkgParams");
   const { pkgScope, pkgName } = adapter.request.url;
   if (!pkgName) {
     return await adapter.response.sendBadRequest();
   }
 
+  await adapter.logger.addBlock("checkAccessPkgInfo");
   const pkgInfoParams = { pkgScope, pkgName };
   if (!(await registry.accessPkgInfo(pkgInfoParams))) {
     return await adapter.response.sendNotFound();
   }
 
+  await adapter.logger.addBlock("send");
   const end = await registry.readPkgInfo(pkgInfoParams);
   await adapter.response.sendOk({ end });
 };
 
 export const install: AdapterHandler = async (adapter) => {
   await adapter.logger.addTitle("install");
-  const isRegistry = !!adapter.registry;
-  await adapter.logger.addValue("isRegistry", isRegistry.toString());
-  if (!isRegistry) return await adapter.response.sendNotFound();
+  await adapter.logger.addBlock("checkRegistry");
+  if (!adapter.registry) return await adapter.response.sendNotFound();
 
+  await adapter.logger.addBlock("checkToken");
   const isCorrectToken = await adapter.isCorrectToken();
-  await adapter.logger.addValue("token", adapter.token?.toString() ?? "");
-  await adapter.logger.addValue("isCorrectToken", isCorrectToken.toString());
   if (!isCorrectToken) return await adapter.response.sendUnauthorized();
 
-  const { isProxy } = adapter.registry;
-  await adapter.logger.addValue("isProxy", isProxy.toString());
   if (adapter.registry.isProxy) await installProxy(adapter);
   else await installLocal(adapter);
 };
 
 const installProxy: AdapterHandler = async (adapter) => {
   await adapter.logger.addTitle("installProxy");
-  const { tarballName } = adapter.request.url;
-  await adapter.logger.addValue("tarballName", tarballName ?? "");
-  if (tarballName) await installProxyTarball(adapter);
+  if (adapter.request.url.tarballName) await installProxyTarball(adapter);
   else await installProxyPkgInfo(adapter);
 };
 
 const installProxyPkgInfo: AdapterHandler = async (adapter) => {
   await adapter.logger.addTitle("installProxyPkgInfo");
+  await adapter.logger.addBlock("checkRegistry");
   const { registry } = adapter;
   if (!registry) return await adapter.response.sendNotFound();
 
+  await adapter.logger.addBlock("checkPkgParams");
   const { pkgScope, pkgName } = adapter.request.url;
-  await adapter.logger.addValue("pkgName", pkgName ?? "");
   if (!pkgName) return await adapter.response.sendBadRequest();
 
+  await adapter.logger.addBlock("proxyRequest");
   const result = await adapter.proxy();
+  await adapter.logger.addBlock("checkProxyResponse");
   if (!result?.res) return await adapter.response.sendBadRequest();
 
+  await adapter.logger.addBlock("checkProxyAuth");
   if (result.res.statusCode === 401) {
     return await adapter.response.sendUnauthorized();
   }
 
+  await adapter.logger.addBlock("checkProxySuccess");
   if (result.res.isSuccess) {
     const data = await result.res.data.value();
     const pkgInfo = await RequestData.toJson<NpmPackageInfoInstall | null>(
@@ -205,55 +246,60 @@ const installProxyPkgInfo: AdapterHandler = async (adapter) => {
     const formattedPkgInfo = await adapter.hooks.formatPackageInfo(pkgInfo);
     const writeParams = { pkgInfo: formattedPkgInfo, pkgScope, pkgName };
     await registry.writePkgInfo(writeParams);
-    await adapter.response.sendOk({ end: JSON.stringify(formattedPkgInfo) });
+    return await adapter.response.sendOk({
+      end: JSON.stringify(formattedPkgInfo),
+    });
   }
 
+  await adapter.logger.addBlock("checkAccessPkgInfo");
   if (!(await registry.accessPkgInfo({ pkgScope, pkgName }))) {
     return await adapter.response.sendNotFound();
   }
 
+  await adapter.logger.addBlock("send");
   const end = await registry.readPkgInfo({ pkgScope, pkgName });
   return await adapter.response.sendOk({ end });
 };
 
 const installProxyTarball: AdapterHandler = async (adapter) => {
   await adapter.logger.addTitle("installProxyTarball");
+  await adapter.logger.addBlock("checkRegistry");
   const { registry } = adapter;
   if (!registry) return await adapter.response.sendNotFound();
 
+  await adapter.logger.addBlock("checkPkgParams");
   const { pkgScope, pkgName, tarballVersion } = adapter.request.url;
-  await adapter.logger.addValue("pkgScope", pkgScope ?? "");
-  await adapter.logger.addValue("pkgName", pkgName ?? "");
-  await adapter.logger.addValue("tarballVersion", tarballVersion ?? "");
   if (!pkgName || !tarballVersion) {
     return await adapter.response.sendBadRequest();
   }
 
+  await adapter.logger.addBlock("checkPkgTarball");
   if (await registry.accessPkgTarball({ pkgScope, pkgName, tarballVersion })) {
     const readParams = { pkgScope, pkgName, tarballVersion };
     const end = await registry.readPkgTarball(readParams);
     return await adapter.response.sendOk({ end });
   }
 
+  await adapter.logger.addBlock("proxyRequest");
   const result = await adapter.proxy();
+  await adapter.logger.addBlock("checkProxyResponse");
   if (!result?.res) return await adapter.response.sendBadRequest();
 
+  await adapter.logger.addBlock("checkProxyAuth");
   if (result.res.statusCode === 401) {
     return await adapter.response.sendUnauthorized();
   }
 
+  await adapter.logger.addBlock("checkProxySuccess");
   if (!result.res.isSuccess) {
     return await adapter.response.send({
       statusCode: result.res.statusCode ?? 404,
     });
   }
 
+  await adapter.logger.addBlock("send");
   const end = await result.res.data.value();
   const writeParams = { pkgScope, pkgName, tarballVersion, data: end };
-  await adapter.logger.addValue(
-    "pkgTarballFile",
-    adapter.registry?.getPkgTarballFile(writeParams) ?? ""
-  );
   await registry.writePkgTarball(writeParams);
   await adapter.response.sendOk({ end });
 };
@@ -267,50 +313,44 @@ const installLocal: AdapterHandler = async (adapter) => {
 
 const installLocalPkgInfo: AdapterHandler = async (adapter) => {
   await adapter.logger.addTitle("installLocalPkgInfo");
-  await adapter.logger.addBlock("check registry");
+  await adapter.logger.addBlock("checkRegistry");
   const { registry } = adapter;
   if (!registry) return await adapter.response.sendNotFound();
 
-  await adapter.logger.addBlock("check pkg params");
+  await adapter.logger.addBlock("checkPkgParams");
   const { pkgScope, pkgName } = adapter.request.url;
-  await adapter.logger.addValue("pkgScope", pkgScope ?? "");
-  await adapter.logger.addValue("pkgName", pkgName ?? "");
   if (!pkgName) return await adapter.response.sendBadRequest();
 
-  await adapter.logger.addBlock("check pkg info file");
+  await adapter.logger.addBlock("checkAccessPkgInfo");
   const isAccessPkgInfo = await registry.accessPkgInfo({ pkgScope, pkgName });
-  await adapter.logger.addValue("isAccessPkgInfo", isAccessPkgInfo.toString());
   if (!isAccessPkgInfo) return await adapter.response.sendNotFound();
 
-  await adapter.logger.addBlock("read pkg info");
+  await adapter.logger.addBlock("send");
   const readParams = { pkgScope, pkgName };
-  await adapter.logger.addValue(
-    "pkgInfoFile",
-    registry.getPkgInfoFile(readParams)
-  );
   const end = await registry.readPkgInfo(readParams);
   await adapter.response.sendOk({ end });
 };
 
 const installLocalTarball: AdapterHandler = async (adapter) => {
   await adapter.logger.addTitle("installLocalTarball");
+  await adapter.logger.addBlock("checkRegistry");
   const { registry } = adapter;
   if (!registry) return await adapter.response.sendNotFound();
 
+  await adapter.logger.addBlock("checkPkgParams");
   const { pkgScope, pkgName, tarballVersion } = adapter.request.url;
-  await adapter.logger.addValue("pkgScope", pkgScope ?? "");
-  await adapter.logger.addValue("pkgName", pkgName ?? "");
-  await adapter.logger.addValue("tarballVersion", tarballVersion ?? "");
   if (!pkgName || !tarballVersion) {
     return await adapter.response.sendBadRequest();
   }
 
+  await adapter.logger.addBlock("checkAccessPkgTarball");
   if (
     !(await registry.accessPkgTarball({ pkgScope, pkgName, tarballVersion }))
   ) {
     return await adapter.response.sendNotFound();
   }
 
+  await adapter.logger.addBlock("send");
   const readParams = { pkgScope, pkgName, tarballVersion };
   const end = await registry.readPkgTarball(readParams);
   return await adapter.response.sendOk({ end });
