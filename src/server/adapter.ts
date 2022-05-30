@@ -1,71 +1,90 @@
 import * as http from "http";
-import * as path from "path";
 
-import { Request, RequestOptionsFormatter } from "./request";
-import { Response } from "./response";
 import {
-  RegistryUrl,
-  Registry,
-  TokenData,
-  SessionData,
-  RegistryHooks,
-  UserData,
-} from "./registry";
+  NpmCredentials,
+  NpmPackageInfo,
+  NpmPackageInfoFull,
+  NpmPackageInfoPublish,
+} from "../utils/npm";
+import { SessionData, Token, TokenData, UserData } from "./registry-cache";
+import { RegistryHooks, RegistryNext, RegistryUrl } from "./registry";
+import { RequestNext, RequestOptionsFormatter } from "./request";
 import { removeProps, removePropsEmpty } from "../utils/object";
-import { NpmPackageInfoFull } from "../utils/npm";
+import { Response } from "./response";
+import { generateToken, hmac } from "../utils/crypto";
+import { Logger } from "./logger";
 
 type AdapterParams = {
-  request: Request;
+  registries: Map<RegistryUrl, RegistryNext>;
+  request: RequestNext;
   response: Response;
-  registries: Map<RegistryUrl, Registry<Adapter>>;
+  logger: Logger;
 };
 
-export class Adapter {
-  private _params: AdapterParams;
-  private _registryHooks: RegistryHooks<Adapter> = {
+export class AdapterNext {
+  private _registries: Map<RegistryUrl, RegistryNext>;
+  private _registryHooks: RegistryHooks = {
     formatPackageInfo: async (info) => info,
   };
+  public request: RequestNext;
+  public response: Response;
+  public logger: Logger;
 
   constructor(params: AdapterParams) {
-    this._params = params;
+    this._registries = params.registries;
+    this.request = params.request;
+    this.response = params.response;
+    this.logger = params.logger;
   }
 
-  public get req(): Request {
-    return this._params.request;
+  public get token(): string | null {
+    return this.request.headers.token;
   }
 
-  public get res(): Response {
-    return this._params.response;
-  }
-
-  public get registry(): Registry<Adapter> | null {
-    const { request, registries } = this._params;
-    return registries.get(request.registryUrl) ?? null;
-  }
-
-  public get tokenData(): Promise<TokenData | null> {
-    return this.registry?.getToken(this.req.token) ?? Promise.resolve(null);
-  }
-
-  public get isCorrectToken(): Promise<boolean> {
-    return this.tokenData.then((data) => !!data) ?? Promise.reject(false);
+  // Registry
+  public get registry(): RegistryNext | null {
+    const registryUrl = this.request.url.registry ?? "";
+    return this._registries.get(registryUrl) ?? null;
   }
 
   public get proxyUrls(): string[] {
+    const { pkgScope, pkgName } = this.request.url;
+    const { npmCommand } = this.request.headers;
     if (!this.registry) return [];
-    const { pkgScope, pkgName, npmCommand } = this._params.request;
     return this.registry.getProxyUrls({ pkgScope, pkgName, npmCommand });
   }
 
-  public get closed(): boolean {
-    return this.res.closed;
+  public get proxyUrl(): string | null {
+    const urls = this.proxyUrls;
+    return urls.length ? urls[0] : null;
   }
 
-  public get session(): Promise<SessionData | null> {
-    return Promise.resolve(this.registry).then((registry) => {
-      if (!registry) return null;
-      return registry.getSession(this.req.token);
-    });
+  public async getTokenData(): Promise<TokenData | null> {
+    if (!this.registry || !this.token) return null;
+    return await this.registry.cache.getToken(this.token);
+  }
+
+  public async getSessionData(): Promise<SessionData | null> {
+    if (!this.registry || !this.token) return null;
+    return this.registry.cache.getSession(this.token);
+  }
+
+  public async getUserData(username?: string): Promise<UserData | null> {
+    const name = (await this.getTokenData())?.username ?? username ?? "";
+    return this.registry?.cache.getUser(name) ?? null;
+  }
+
+  public async getAuthorization(targetUrl: string): Promise<string> {
+    const sessionData = await this.getSessionData();
+    const token = sessionData?.registries[targetUrl];
+    if (!sessionData || !token) return "";
+    return `Bearer ${token}`;
+  }
+
+  public async createToken(tokenData: TokenData): Promise<Token> {
+    const token = generateToken();
+    await this.registry?.cache.setToken(token, tokenData);
+    return token;
   }
 
   public get hooks() {
@@ -74,71 +93,134 @@ export class Adapter {
         const handler =
           this.registry?.hooks.formatPackageInfo ??
           this._registryHooks.formatPackageInfo;
-        return handler(info, this);
+        return handler(info, this.request);
       },
     };
   }
 
-  public get registryPackagesDir(): string {
-    return this.registry?.packagesDir ?? "";
+  public get pkgInfoFile(): string | null {
+    const { pkgScope, pkgName } = this.request.url;
+    if (!pkgName) return null;
+
+    return this.registry?.getPkgInfoFile({ pkgScope, pkgName }) ?? null;
   }
 
-  public get infoDir(): string {
-    return path.join(
-      this.registryPackagesDir,
-      this.req.path.dir,
-      this.req.path.base
+  public get pkgTarballFile(): string | null {
+    const { pkgScope, pkgName, tarballVersion } = this.request.url;
+    if (!pkgName || !tarballVersion) return null;
+
+    return (
+      this.registry?.getPkgTarballFile({ pkgScope, pkgName, tarballVersion }) ??
+      null
     );
   }
 
-  public get infoFile(): string {
-    return path.join(this.infoDir, "info.json");
+  public async isCorrectToken(): Promise<boolean> {
+    if (!this.registry || !this.token) return false;
+    return await this.registry.cache.isCorrectToken(this.token);
   }
 
-  public get tarballDir(): string {
-    const isPublish = this.req.npmCommand === "publish";
-    return path.join(
-      this.registryPackagesDir,
-      this.req.path.dir,
-      isPublish ? this.req.path.base : "",
-      isPublish ? "-" : ""
-    );
-  }
+  // public async proxyRequest(
+  //   targetUrl: string,
+  //   formatter: RequestOptionsFormatter = (options) => options
+  // ): Promise<{ req: http.ClientRequest; res?: RequestNext }> {
+  //   const authorization = await this.getAuthorization(targetUrl);
+  //   return await this.request.proxy(targetUrl, (options, extra) => {
+  //     const headers = {
+  //       ...removeProps(options.headers ?? {}, "accept", "accept-encoding"),
+  //       authorization,
+  //     };
+  //     const nextOptions = removePropsEmpty({ ...options, headers });
+  //     return formatter(nextOptions, extra);
+  //   });
+  // }
 
-  public get tarballFile(): string {
-    return path.join(this.tarballDir, this.req.path.base);
-  }
+  public async proxy(params?: {
+    data?: Buffer;
+    formatter?: RequestOptionsFormatter;
+  }): Promise<{ req: http.ClientRequest; res?: RequestNext } | null> {
+    if (!this.proxyUrl) return null;
 
-  public get userData(): Promise<UserData | null> {
-    return this.tokenData.then((tokenData) => {
-      if (!tokenData) return null;
-      const registry = this.registry;
-      if (!registry) return null;
-      return registry.getUser(tokenData.username);
-    });
-  }
-
-  public async getAuthorization(targetUrl: string): Promise<string> {
-    const sessionData = await this.session;
-    if (!sessionData) return "";
-    const token = sessionData.registries[targetUrl] ?? "";
-    if (!token) return "";
-    return `Bearer ${token}`;
-  }
-
-  public async proxyRequest(
-    targetUrl: string,
-    formatter: RequestOptionsFormatter = (options) => options
-  ): Promise<{ req: http.ClientRequest; res?: Request }> {
-    const authorization = await this.getAuthorization(targetUrl);
-    return await this.req.proxyRequest(targetUrl, (options, extra) => {
-      const headers = {
-        ...removeProps(options.headers ?? {}, "accept", "accept-encoding"),
-        authorization,
-      };
-      // const m = (options.path ?? "").match(/^\/@(.*)/) ?? [];
+    const authorization = await this.getAuthorization(this.proxyUrl);
+    const _formatter: RequestOptionsFormatter =
+      params?.formatter ?? ((options) => options);
+    const formatter: RequestOptionsFormatter = (options) => {
+      const headerKeys = ["accept", "accept-encoding"];
+      const headers = removeProps(options.headers ?? {}, ...headerKeys);
+      Object.assign(headers, { authorization });
       const nextOptions = removePropsEmpty({ ...options, headers });
-      return formatter(nextOptions, extra);
+      return _formatter(nextOptions);
+    };
+
+    return await this.request.proxy({
+      targetUrl: this.proxyUrl,
+      data: params?.data,
+      formatter,
     });
+
+    // for (const targetUrl of this.proxyUrls) {
+    //   const { req, res } = await this.proxyRequest(targetUrl, formatter);
+    //   if (res?.isSuccess) return { req, res };
+    // }
+
+    // return null;
   }
+
+  public async readPkgInfo(): Promise<NpmPackageInfo> {
+    if (!this.registry) return AdapterNext.defPkgInfo;
+
+    const { pkgScope, pkgName } = this.request.url;
+    if (!pkgName) return AdapterNext.defPkgInfo;
+
+    return await this.registry.readPkgInfoJson({ pkgScope, pkgName });
+  }
+
+  public async writePkgInfo(pkgInfo: NpmPackageInfo): Promise<void> {
+    if (!this.registry) return;
+
+    const { pkgScope, pkgName } = this.request.url;
+    if (!pkgName) return;
+
+    return await this.registry.writePkgInfo({ pkgScope, pkgName, pkgInfo });
+  }
+
+  public async mergePkgInfo(
+    pkgInfo: NpmPackageInfoFull
+  ): Promise<NpmPackageInfo> {
+    if (!this.registry) return AdapterNext.defPkgInfo;
+
+    const { pkgScope, pkgName } = this.request.url;
+    if (!pkgName) return AdapterNext.defPkgInfo;
+
+    return await this.registry.mergePkgInfo({ pkgScope, pkgName, pkgInfo });
+  }
+
+  // public async readPkgInfo(): Promise<NpmPackageInfo> {
+  //   return (await readJson<NpmPackageInfo>(this.infoFile)) ?? { versions: {} };
+  // }
+
+  // Request
+  public async getDataAdduser(): Promise<NpmCredentials | null> {
+    const requestData = this.request.data;
+    const data = await requestData.json<Partial<NpmCredentials> | null>(null);
+    if (!data || !data.name || !data.password || !data.email) return null;
+    return { name: "", password: "", email: "", ...data };
+  }
+
+  public async isCorrectPassword(
+    password: string,
+    username?: string
+  ): Promise<boolean> {
+    const userData = await this.getUserData(username);
+    return !!(userData && userData.password === hmac(password));
+  }
+
+  public async getPkgInfo(): Promise<NpmPackageInfoPublish | null> {
+    return await this.request.data.json<NpmPackageInfoPublish | null>(null);
+  }
+
+  static defPkgInfo: NpmPackageInfo = {
+    name: "",
+    versions: {},
+  };
 }

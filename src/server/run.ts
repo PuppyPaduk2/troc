@@ -1,54 +1,70 @@
 import * as path from "path";
-import { Adapter } from "./adapter";
-import { formatPackageInfo } from "./hooks";
+import { formatPackageInfo } from "./hooks/next";
 
 import { createHttpServer as createHttpServerRoot } from "./http-server";
-import { Registry, RegistryParams } from "./registry";
+import { RegistryNext, RegistryParams } from "./registry";
 
 const proxyPort = 4000;
 const dir = path.join(__dirname, "storage-root");
 const config: {
-  registries: RegistryParams<Adapter>[];
+  registries: Record<string, RegistryParams>;
 } = {
-  registries: [
-    {
-      url: "",
+  registries: {
+    "": {
       dir: path.join(dir, "__root__"),
       proxyConfigs: [
         {
           url: "https://registry.npmjs.org",
-          commands: ["install", "view"],
-          exclude: { names: ["pack", "pack-1"] },
+          include: [
+            "/(install|view)/(.*)",
+            "/(install|view)/p3",
+            "/(install|view)/@my/p3",
+          ],
+          exclude: ["/(install|view)/p1", "/(install|view)/@my/(.*)"],
         },
         {
-          url: "http://0.0.0.0:4000/protected",
-          names: ["pack", "pack-1"],
+          url: "http://localhost:4000/protected",
+          include: [
+            "/(install|view)/p1",
+            "/(install|view)/@my/(.*)",
+            "/(install|view)/p3",
+          ],
         },
       ],
       hooks: { formatPackageInfo },
     },
-    {
-      url: "/protected",
+    "/protected": {
       dir: path.join(dir, "protected"),
-      proxyConfigs: [],
+      proxyConfigs: [
+        {
+          url: "http://localhost:4000/protected/my",
+          include: [
+            "/(install|view|publish)/p1",
+            "/(install|view|publish)/@my/(.*)",
+            "/(install|view|publish)/p3",
+          ],
+        },
+      ],
       hooks: {},
     },
-    {
-      url: "/protected/my",
+    "/protected/my": {
       dir: path.join(dir, "protected-my"),
       proxyConfigs: [],
       hooks: {},
     },
-  ],
+    "/custom": {
+      dir: path.join(dir, "custom"),
+      proxyConfigs: [],
+      hooks: {},
+    },
+  },
 };
-const registries = config.registries.map<[string, Registry<Adapter>]>(
-  (registryConfig) => [registryConfig.url, new Registry(registryConfig)]
-);
+const registries = Object.entries(config.registries).map<
+  [string, RegistryNext]
+>(([url, registryConfig]) => [url, new RegistryNext(registryConfig)]);
 const proxyServer = createHttpServerRoot({ registries: new Map(registries) });
 
-Promise.allSettled(registries).then(() => {
-  proxyServer.addListener("listening", () => {
-    console.log(`Server started http://localhost:${proxyPort}`);
-  });
-  proxyServer.listen(proxyPort);
+proxyServer.addListener("listening", () => {
+  console.log(`Server started http://localhost:${proxyPort}`);
 });
+proxyServer.listen(proxyPort);

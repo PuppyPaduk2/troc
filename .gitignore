@@ -1,11 +1,4 @@
 node_modules
-packages
-apps
-src-*
 dist
-dist/registry-*
-pack*
-libs
-p1
 .DS_Store
-@evgenyifedotov
+_packages

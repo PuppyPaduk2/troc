@@ -1,207 +1,200 @@
 import * as path from "path";
-import { NpmPackageInfo, NpmPackageInfoFull } from "../utils/npm";
+import { match, MatchFunction } from "path-to-regexp";
+import * as fs from "fs/promises";
+import * as merge from "merge";
 
-import { Cache, File } from "./cache";
+import { accessSoft, readFileSoft, readJson } from "../utils/fs";
+import { NpmPackageInfo, NpmPackageInfoFull } from "../utils/npm";
+import { RegistryCache } from "./registry-cache";
+import { RequestNext } from "./request";
+import { removeProps } from "../utils/object";
 
 export type RegistryUrl = string;
 
 export type RegistryDir = string;
 
-export type Username = string;
-
-export type UserData = {
-  password: string;
-  email: string;
-};
-
-export type Token = string;
-
-export type TokenData = {
-  username: string;
-};
-
-export type SessionData = {
-  registries: Record<string, string>;
-};
-
-export type ProxyConfig = {
+export type ProxyConfig<T> = {
   url: string;
-  names?: string[];
-  scopes?: string[];
-  commands?: string[];
-  exclude?: {
-    names?: string[];
-    scopes?: string[];
-    commands?: string[];
-  };
+  include?: T[];
+  exclude?: T[];
 };
 
-export type RegistryParams<Adapter> = {
-  url: RegistryUrl;
+export type RegistryParams = {
   dir: RegistryDir;
-  proxyConfigs: ProxyConfig[];
-  hooks: Partial<RegistryHooks<Adapter>>;
+  proxyConfigs: ProxyConfig<string>[];
+  hooks: Partial<RegistryHooks>;
 };
 
-export type RegistryHooks<Adapter> = {
+export type RegistryHooks = {
   formatPackageInfo: (
     info: NpmPackageInfoFull,
-    adapter: Adapter
+    request: RequestNext
   ) => Promise<NpmPackageInfo>;
 };
 
-export class Registry<Adapter> {
-  private _params: RegistryParams<Adapter>;
-  private _users: Cache<UserData>;
-  private _tokens: Cache<TokenData>;
-  private _sessions: Cache<SessionData>;
-  private _hooks: RegistryHooks<Adapter> = {
+export class RegistryNext {
+  private _dir: RegistryDir;
+  private _proxyConfigs: ProxyConfig<MatchFunction>[];
+  public cache: RegistryCache;
+  public hooks: RegistryHooks = {
     formatPackageInfo: async (info) => info,
   };
 
-  constructor(params: RegistryParams<Adapter>) {
-    this._params = params;
-    this._users = new Cache<UserData>({
-      file: this._getCacheFile("users.json"),
-    });
-    this._tokens = new Cache<TokenData>({
-      file: this._getCacheFile("tokens.json"),
-    });
-    this._sessions = new Cache<SessionData>({
-      file: this._getCacheFile("sessions.json"),
-    });
-  }
-
-  private _getCacheFile(file: File): File {
-    return path.join(this.dir, file);
-  }
-
-  public get dir(): string {
-    return this._params.dir;
+  constructor(params: RegistryParams) {
+    this._dir = params.dir;
+    this._proxyConfigs = params.proxyConfigs.map((config) => ({
+      ...config,
+      include: config.include?.map((item) => match(item)) ?? [],
+      exclude: config.exclude?.map((item) => match(item)) ?? [],
+    }));
+    this.cache = new RegistryCache(this._dir);
+    this.hooks = { ...this.hooks, ...params.hooks };
   }
 
   public get packagesDir(): string {
-    return path.join(this.dir, "packages");
+    return path.join(this._dir, "packages");
   }
 
   public get isProxy(): boolean {
-    return Boolean(this._params.proxyConfigs.length);
-  }
-
-  public get hooks(): RegistryHooks<Adapter> {
-    return {
-      formatPackageInfo: (info, adapter) => {
-        const handler =
-          this._params.hooks.formatPackageInfo ?? this._hooks.formatPackageInfo;
-        return handler(info, adapter);
-      },
-    };
-  }
-
-  public async readCache(): Promise<void> {
-    const { _users, _tokens, _sessions } = this;
-    await Promise.allSettled([_users.read(), _tokens.read(), _sessions.read()]);
-    await Promise.allSettled([
-      _users.write(),
-      _tokens.write(),
-      _sessions.write(),
-    ]);
-  }
-
-  public async getUser(name: Username): Promise<UserData | null> {
-    return await this._users.get(name);
-  }
-
-  public async setUser(name: Username, userData: UserData): Promise<void> {
-    await this._users.set(name, userData);
-    await this._users.writeRecord(name, userData);
-  }
-
-  public async setToken(token: Token, tokenData: TokenData): Promise<void> {
-    await this._tokens.set(token, tokenData);
-    await this._tokens.writeRecord(token, tokenData);
-  }
-
-  public async getToken(token: Token): Promise<TokenData | null> {
-    return await this._tokens.get(token);
-  }
-
-  public async removeToken(token: Token): Promise<boolean> {
-    const result = await this._tokens.remove(token);
-    await this._tokens.write();
-    return result;
-  }
-
-  public async isCorrectToken(token: Token): Promise<boolean> {
-    return await this._tokens.has(token);
-  }
-
-  public async setSession(
-    token: Token,
-    sessionData: SessionData
-  ): Promise<void> {
-    await this._sessions.set(token, sessionData);
-    await this._sessions.writeRecord(token, sessionData);
-  }
-
-  public async getSession(token: Token): Promise<SessionData | null> {
-    return await this._sessions.get(token);
-  }
-
-  public async addSessionRegistry(
-    token: Token,
-    registryUrl: string,
-    registryToken: string
-  ): Promise<boolean> {
-    const sessionData = await this.getSession(token);
-    const registries = {
-      ...(sessionData?.registries ?? {}),
-      [registryUrl]: registryToken,
-    };
-    await this.setSession(token, { ...sessionData, registries });
-    return true;
-  }
-
-  public async removeSession(token: Token): Promise<boolean> {
-    const result = await this._sessions.remove(token);
-    await this._sessions.write();
-    return result;
+    return Boolean(this._proxyConfigs.length);
   }
 
   public getProxyUrls(params: {
-    pkgScope: string;
-    pkgName: string;
-    npmCommand: string;
+    npmCommand?: string | null;
+    pkgScope?: string | null;
+    pkgName?: string | null;
   }): string[] {
-    const { pkgScope, pkgName, npmCommand } = params;
+    const npmCommand = params.npmCommand ?? "";
+    const pkgScope = params.pkgScope ?? "";
+    const pkgName = params.pkgName ?? "";
     const filteredUrls: string[] = [];
-
-    for (const config of this._params.proxyConfigs) {
-      if (
-        !config.exclude?.scopes?.includes(pkgScope) &&
-        !config.exclude?.names?.includes(pkgName) &&
-        !config.exclude?.commands?.includes(npmCommand)
-      ) {
-        const { scopes = [], names = [], commands = [] } = config;
-
-        const isAnyScope = !scopes.length;
-        const isScope = Boolean(scopes.includes(pkgScope)) || isAnyScope;
-
-        const isAnyName = !names.length;
-        const isName = Boolean(names.includes(pkgName)) || isAnyName;
-
-        const isAnyCommand = !commands.length;
-        const isCommand =
-          Boolean(commands.includes(npmCommand)) || isAnyCommand;
-
-        const isAll = isAnyName && isAnyScope && isAnyCommand;
-
-        if ((isName && isScope && isCommand) || isAll) {
-          filteredUrls.push(config.url);
-        }
-      }
+    const key = "/" + path.join(npmCommand, pkgScope, pkgName);
+    for (const config of this._proxyConfigs) {
+      const { include = [], exclude = [] } = config;
+      const isInclude =
+        include.map((match) => !!match(key)).find((value) => value) ?? false;
+      const isExclude =
+        exclude.map((match) => !!match(key)).find((value) => value) ?? false;
+      if (isInclude && !isExclude) filteredUrls.push(config.url);
     }
-
     return Array.from(new Set(filteredUrls));
+  }
+
+  public getProxyUrl(params: {
+    npmCommand?: string | null;
+    pkgScope?: string | null;
+    pkgName?: string | null;
+  }): string | null {
+    const urls = this.getProxyUrls(params);
+    return urls.length ? urls[0] : null;
+  }
+
+  public getPkgFolder(params: {
+    pkgScope?: string | null;
+    pkgName: string;
+  }): string {
+    return path.join(params.pkgScope ?? "", params.pkgName);
+  }
+
+  public getPkgInfoFile(params: {
+    pkgScope?: string | null;
+    pkgName: string;
+  }): string {
+    return path.join(this.packagesDir, this.getPkgFolder(params), "info.json");
+  }
+
+  public getPkgTarballPathname(params: {
+    pkgScope?: string | null;
+    pkgName: string;
+    tarballVersion: string;
+  }): string {
+    const pkgFolder = this.getPkgFolder(params);
+    const folder = path.join(pkgFolder, "-" /*, params.pkgScope ?? ""*/);
+    const name = params.pkgName + "-" + params.tarballVersion + ".tgz";
+    return path.join(folder, name);
+  }
+
+  public getPkgTarballFile(params: {
+    pkgScope?: string | null;
+    pkgName: string;
+    tarballVersion: string;
+  }): string {
+    return path.join(this.packagesDir, this.getPkgTarballPathname(params));
+  }
+
+  public async readPkgInfo(params: {
+    pkgScope?: string | null;
+    pkgName: string;
+  }): Promise<Buffer> {
+    const file = this.getPkgInfoFile(params);
+    return await readFileSoft(file);
+  }
+
+  public async readPkgInfoJson(params: {
+    pkgScope?: string | null;
+    pkgName: string;
+  }): Promise<NpmPackageInfo> {
+    const file = this.getPkgInfoFile(params);
+    return (await readJson(file)) ?? { name: "", versions: {} };
+  }
+
+  public async writePkgInfo(params: {
+    pkgScope?: string | null;
+    pkgName: string;
+    pkgInfo: NpmPackageInfo;
+  }): Promise<void> {
+    const file = this.getPkgInfoFile(params);
+    const dir = path.dirname(file);
+    await fs.mkdir(dir, { recursive: true });
+    await fs.writeFile(file, JSON.stringify(params.pkgInfo, null, 2));
+  }
+
+  public async accessPkgInfo(params: {
+    pkgScope?: string | null;
+    pkgName: string;
+  }): Promise<boolean> {
+    const file = this.getPkgInfoFile(params);
+    return await accessSoft(file);
+  }
+
+  public async mergePkgInfo(params: {
+    pkgScope?: string | null;
+    pkgName: string;
+    pkgInfo: NpmPackageInfoFull;
+  }): Promise<NpmPackageInfo> {
+    const clonedPkgInfo = JSON.parse(JSON.stringify(params.pkgInfo));
+    const pkgInfo = removeProps(clonedPkgInfo, "_attachments");
+    const currPkgInfo = await this.readPkgInfoJson(params);
+    return merge.recursive(currPkgInfo, pkgInfo);
+  }
+
+  public async readPkgTarball(params: {
+    pkgScope?: string | null;
+    pkgName: string;
+    tarballVersion: string;
+  }): Promise<Buffer> {
+    const file = this.getPkgTarballFile(params);
+    return await readFileSoft(file);
+  }
+
+  public async writePkgTarball(params: {
+    pkgScope?: string | null;
+    pkgName: string;
+    tarballVersion: string;
+    data: Buffer | string;
+  }): Promise<void> {
+    const file = this.getPkgTarballFile(params);
+    const dir = path.dirname(file);
+    await fs.mkdir(dir, { recursive: true });
+    await fs.writeFile(file, params.data, "base64");
+  }
+
+  public async accessPkgTarball(params: {
+    pkgScope?: string | null;
+    pkgName: string;
+    tarballVersion: string;
+  }): Promise<boolean> {
+    const file = this.getPkgTarballFile(params);
+    return await accessSoft(file);
   }
 }

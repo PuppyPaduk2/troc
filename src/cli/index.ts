@@ -65,7 +65,7 @@ async function getFetchHref(
 ): Promise<string> {
   const registryUrl = await getNpmRegistryUrl(registry);
 
-  registryUrl.pathname = path.join("/api", registryUrl.pathname, pathname);
+  registryUrl.pathname = path.join(registryUrl.pathname, "/-/troc", pathname);
   return registryUrl.href;
 }
 
