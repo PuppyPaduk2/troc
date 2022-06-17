@@ -2,12 +2,12 @@ import * as http from "http";
 
 import { Registry } from "../../utils/registry";
 import { sendBadRequest, sendNotFound } from "../../utils/response";
+import { parseUrl } from "../../utils/url";
 import { getRequestEvent } from "./request-event";
 import {
   RequestEventHandler,
   ResponseCallback,
 } from "./request-event-handler/types";
-import { parseUrl } from "../../utils/url";
 
 type RequestHandlerOptions = {
   registries: Registry[];

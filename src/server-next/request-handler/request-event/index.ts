@@ -1,18 +1,18 @@
 import * as http from "http";
 
+import { PkgPath } from "../../../utils/pkg-path";
 import {
   findRegistry,
   getRegistryType,
   Registry,
 } from "../../../utils/registry";
+import { ParsedUrl } from "../../../utils/url";
 import { parseApiPath } from "./api-path";
 import { parseApiVersion } from "./api-version";
 import { RequestKey } from "./key";
 import { parseNpmCommand } from "./npm-command";
 import { buildPkgAction } from "./pkg-action";
-import { PkgPath } from "../../../utils/pkg-path";
 import { buildType } from "./type";
-import { ParsedUrl } from "../../../utils/url";
 
 type GetRequestEventOptions = {
   registries: Registry[];

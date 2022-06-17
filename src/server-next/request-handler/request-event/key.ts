@@ -1,7 +1,6 @@
 import { RegistryType } from "../../../utils/registry";
 import { ApiPath } from "./api-path";
 import { ApiVersion } from "./api-version";
-
 import { NpmCommand } from "./npm-command";
 import { PkgAction } from "./pkg-action";
 import { Type } from "./type";

@@ -1,6 +1,6 @@
 import * as path from "path";
-import { spawn } from "./cp";
 
+import { spawn } from "./cp";
 import { readFileSoft } from "./fs";
 
 export type NpmTokenResponse = {

@@ -1,15 +1,15 @@
 import * as http from "http";
 import * as path from "path";
 
-import { getPort } from "./utils/net";
 import {
   createRequestEventHandler,
   createRequestHandler,
   RequestEventHandler,
   requestEventHandlers,
 } from "./server-next";
-import { createRegistry } from "./utils/registry";
 import { logTimeMs } from "./utils/log";
+import { getPort } from "./utils/net";
+import { createRegistry } from "./utils/registry";
 
 const server = http.createServer();
 const dir = path.join(__dirname, "storage-root");

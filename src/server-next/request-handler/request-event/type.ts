@@ -1,5 +1,5 @@
-import { NpmCommand } from "./npm-command";
 import { ParsedUrl } from "../../../utils/url";
+import { NpmCommand } from "./npm-command";
 
 export enum Type {
   npmCommand = "npm-command",
