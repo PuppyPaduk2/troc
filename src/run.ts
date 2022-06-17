@@ -6,7 +6,7 @@ import {
   createRequestHandler,
   RequestEventHandler,
   requestEventHandlers,
-} from "./server-next";
+} from "./server";
 import { logTimeMs } from "./utils/log";
 import { getPort } from "./utils/net";
 import { createRegistry } from "./utils/registry";
