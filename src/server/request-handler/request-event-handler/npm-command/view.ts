@@ -1,18 +1,20 @@
 import { accessSoft, readFileSoft, writeFile } from "../../../../utils/fs";
 import { NpmPackageInfoInstall } from "../../../../utils/npm";
-import { RegistryType } from "../../../../utils/registry";
 import { getIncomingMessageJson } from "../../../../utils/request";
+import {
+  NpmCommand,
+  PkgAction,
+  RegistryType,
+  RequestKey,
+  RequestType,
+} from "../../../../utils/request-key";
 import { attachResponse } from "../../../../utils/response";
-import { RequestKey } from "../../request-event/key";
-import { NpmCommand } from "../../request-event/npm-command";
-import { PkgAction } from "../../request-event/pkg-action";
-import { Type } from "../../request-event/type";
 import { RequestEventHandler, RequestEventHandlers } from "../types";
 import { getPkgTarballUrl } from "../utils/pkg";
 import { redirectNpmRequest } from "../utils/request";
 
 const viewKey = new RequestKey({
-  type: Type.npmCommand,
+  requestType: RequestType.npmCommand,
   npmCommand: NpmCommand.view,
 });
 const localKey = viewKey.fork({

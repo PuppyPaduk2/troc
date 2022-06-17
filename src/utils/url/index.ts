@@ -6,12 +6,10 @@ export type ParsedUrl = {
   pkgScope: string;
   pkgName: string;
   tarballVersion: string;
-  apiOwner: ApiOwner;
+  apiOwner: string;
   apiVersion: string;
   apiPath: string;
 };
-
-export type ApiOwner = "npm" | "troc" | "unknown";
 
 export const parseUrl = (url?: string): ParsedUrl => {
   const origin = decodeURIComponent(url ?? "");
@@ -92,12 +90,18 @@ const getTarballName: GetUrlProp = (matchedUrl) => {
 };
 
 const getApiOwner = (matchedUrl: MatchedUrl): ApiOwner => {
-  if (matchedUrl.npmApiUser) return "npm";
-  if (matchedUrl.npmApiV) return "npm";
-  if (matchedUrl.npmApi) return "npm";
-  if (matchedUrl.trocApi) return "troc";
-  return "unknown";
+  if (matchedUrl.npmApiUser) return ApiOwner.npm;
+  if (matchedUrl.npmApiV) return ApiOwner.npm;
+  if (matchedUrl.npmApi) return ApiOwner.npm;
+  if (matchedUrl.trocApi) return ApiOwner.troc;
+  return ApiOwner.unknown;
 };
+
+export enum ApiOwner {
+  npm = "npm",
+  troc = "troc",
+  unknown = "unknown",
+}
 
 const getApiVersion: GetUrlProp = (matchedUrl) => {
   if (matchedUrl.npmApiUser) return "";

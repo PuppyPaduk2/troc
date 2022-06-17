@@ -31,7 +31,7 @@ const getOptions = (
 ): http.RequestOptions | Error => {
   const targetUrl = getProxyUrl({
     registry: event.registry,
-    npmCommand: event.key.npmCommand,
+    npmCommand: event.npmCommand,
     pkgScope: event.parsedUrl.pkgScope,
     pkgName: event.parsedUrl.pkgName,
   });

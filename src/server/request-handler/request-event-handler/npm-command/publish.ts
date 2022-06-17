@@ -8,20 +8,22 @@ import {
 } from "../../../../utils/fs";
 import { NpmPackageInfo, NpmPackageInfoPublish } from "../../../../utils/npm";
 import { removeProps } from "../../../../utils/object";
-import { RegistryType } from "../../../../utils/registry";
 import {
   getIncomingMessageData,
   getIncomingMessageJson,
 } from "../../../../utils/request";
+import {
+  NpmCommand,
+  RegistryType,
+  RequestKey,
+  RequestType,
+} from "../../../../utils/request-key";
 import { attachResponse } from "../../../../utils/response";
-import { RequestKey } from "../../request-event/key";
-import { NpmCommand } from "../../request-event/npm-command";
-import { Type } from "../../request-event/type";
 import { RequestEventHandler, RequestEventHandlers } from "../types";
 import { redirectNpmRequest } from "../utils/request";
 
 const publishKey = new RequestKey({
-  type: Type.npmCommand,
+  requestType: RequestType.npmCommand,
   npmCommand: NpmCommand.publish,
 });
 const proxyKey = publishKey.fork({

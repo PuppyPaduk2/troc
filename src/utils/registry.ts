@@ -27,6 +27,7 @@ export const findRegistry = (
 export enum RegistryType {
   local = "local",
   proxy = "proxy",
+  unknown = "unknown",
 }
 
 export const getRegistryType = (
