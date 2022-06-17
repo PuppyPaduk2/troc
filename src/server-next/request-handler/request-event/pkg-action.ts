@@ -1,5 +1,5 @@
 import { NpmCommand } from "./npm-command";
-import { ParsedUrl } from "./url";
+import { ParsedUrl } from "../../../utils/url";
 
 export enum PkgAction {
   getInfo = "get-info",

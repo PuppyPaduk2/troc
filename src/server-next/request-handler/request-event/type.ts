@@ -1,5 +1,5 @@
 import { NpmCommand } from "./npm-command";
-import { ParsedUrl } from "./url";
+import { ParsedUrl } from "../../../utils/url";
 
 export enum Type {
   npmCommand = "npm-command",
@@ -9,8 +9,8 @@ export enum Type {
 }
 
 export const buildType = (params: {
-  npmCommand: NpmCommand | null;
   parsedUrl: ParsedUrl;
+  npmCommand: NpmCommand | null;
 }): Type => {
   const { npmCommand, parsedUrl } = params;
   const { apiOwner } = parsedUrl;

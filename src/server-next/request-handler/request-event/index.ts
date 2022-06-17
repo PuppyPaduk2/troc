@@ -12,7 +12,7 @@ import { parseNpmCommand } from "./npm-command";
 import { buildPkgAction } from "./pkg-action";
 import { PkgPath } from "../../../utils/pkg-path";
 import { buildType } from "./type";
-import { ParsedUrl, parseUrl } from "./url";
+import { ParsedUrl } from "../../../utils/url";
 
 type GetRequestEventOptions = {
   registries: Registry[];
@@ -27,10 +27,10 @@ export type RequestEvent = {
 
 export const getRequestEvent = (
   request: http.IncomingMessage,
+  parsedUrl: ParsedUrl,
   options: GetRequestEventOptions
 ): RequestEvent | Error => {
   const { registries } = options;
-  const parsedUrl = parseUrl(request.url);
   const registry = findRegistry(registries, parsedUrl.registryPath);
   if (!registry) return new Error("Registry doesn't exist");
 

@@ -7,6 +7,7 @@ import {
   RequestEventHandler,
   ResponseCallback,
 } from "./request-event-handler/types";
+import { parseUrl } from "../../utils/url";
 
 type RequestHandlerOptions = {
   registries: Registry[];
@@ -16,7 +17,8 @@ type RequestHandlerOptions = {
 export const createRequestHandler =
   (options: RequestHandlerOptions) =>
   async (request: http.IncomingMessage, response: http.ServerResponse) => {
-    const requestEvent = getRequestEvent(request, options);
+    const parsedUrl = parseUrl(request.url);
+    const requestEvent = getRequestEvent(request, parsedUrl, options);
     if (requestEvent instanceof Error) {
       console.log(requestEvent);
       return sendBadRequest(response)();
