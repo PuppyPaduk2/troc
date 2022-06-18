@@ -1,6 +1,8 @@
 import * as http from "http";
 
-import { RequestEvent } from "../request-event";
+import { RequestEvent } from "../../../utils/request-event";
+
+// import { RequestEvent } from "../request-event";
 
 export type ResponseCallback = (() => Promise<void> | void) | null | void;
 

@@ -9,7 +9,7 @@ import {
   requestToOptions,
   urlToOptions,
 } from "../../../../../utils/request";
-import { RequestEvent } from "../../../request-event";
+import { RequestEvent } from "../../../../../utils/request-event";
 
 export const redirectNpmRequest = async (
   event: RequestEvent,
