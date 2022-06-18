@@ -9,12 +9,12 @@ import {
 } from "./server";
 import { logTimeMs } from "./utils/log";
 import { getPort } from "./utils/net";
-import { createRegistry } from "./utils/registry";
+import { Registry } from "./utils/registry";
 
 const server = http.createServer();
 const dir = path.join(__dirname, "storage-root");
 const registries = {
-  root: createRegistry({
+  root: new Registry({
     path: "",
     dir: path.join(dir, "__root__"),
     proxies: [
@@ -37,7 +37,7 @@ const registries = {
       },
     ],
   }),
-  protected: createRegistry({
+  protected: new Registry({
     path: "/protected",
     dir: path.join(dir, "protected"),
     proxies: [
@@ -60,17 +60,17 @@ const registries = {
       },
     ],
   }),
-  protectedMy: createRegistry({
+  protectedMy: new Registry({
     path: "/protected/my",
     dir: path.join(dir, "protected-my"),
     proxies: [],
   }),
-  custom: createRegistry({
+  custom: new Registry({
     path: "/custom",
     dir: path.join(dir, "custom"),
     proxies: [],
   }),
-  customNext0: createRegistry({
+  customNext0: new Registry({
     path: "/custom-next-0",
     dir: path.join(dir, "/custom-next-0"),
     proxies: [

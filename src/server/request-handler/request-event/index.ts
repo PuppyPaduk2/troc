@@ -2,7 +2,7 @@ import * as http from "http";
 
 import { parseNpmCommand } from "../../../utils/npm-command";
 import { PkgPath } from "../../../utils/pkg-path";
-import { findRegistry, Registry } from "../../../utils/registry";
+import { Registry } from "../../../utils/registry";
 import { NpmCommand, RequestKey } from "../../../utils/request-key";
 import { ParsedUrl } from "../../../utils/url";
 
@@ -23,8 +23,8 @@ export const getRequestEvent = (
   parsedUrl: ParsedUrl,
   options: GetRequestEventOptions
 ): RequestEvent | Error => {
-  const { registries } = options;
-  const registry = findRegistry(registries, parsedUrl.registryPath);
+  const findRegistry = Registry.match.bind(null, parsedUrl.registryPath);
+  const registry = options.registries.find(findRegistry);
   if (!registry) return new Error("Registry doesn't exist");
 
   const npmCommand = parseNpmCommand(request.headers.referer);

@@ -1,6 +1,6 @@
 import { NpmCommand } from "./npm-command";
 import { buildPkgAction, PkgAction } from "./pkg-action";
-import { getRegistryType, Registry, RegistryType } from "./registry";
+import { Registry, RegistryType } from "./registry";
 import { buildRequestType, RequestType } from "./request-type";
 import { ParsedUrl } from "./url";
 
@@ -61,7 +61,7 @@ export class RequestKey {
   }): RequestKeyParams => {
     const { parsedUrl, registry, npmCommand } = params;
     return {
-      registryType: getRegistryType(registry),
+      registryType: registry.type,
       requestType: buildRequestType({ parsedUrl, npmCommand }),
       pkgAction: buildPkgAction({ parsedUrl, npmCommand }),
       apiVersion: parsedUrl.apiVersion,

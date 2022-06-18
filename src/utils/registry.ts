@@ -1,27 +1,95 @@
 import * as path from "path";
 import { match, MatchFunction } from "path-to-regexp";
 
-export type RegistryCommon<T> = {
+export class Registry {
+  path = "";
+  dir = "";
+  proxies: ProxyConfigMatch[] = [];
+
+  constructor(config: Config) {
+    this.path = config.path;
+    this.dir = config.dir;
+    this.proxies = config.proxies.map(Registry.toProxyConfigMatch);
+  }
+
+  get type(): RegistryType {
+    return this.proxies.length ? RegistryType.proxy : RegistryType.local;
+  }
+
+  getProxyUrl(params: ProxyKeyParams): string | null {
+    return this.getProxyUrls(params)[0] ?? null;
+  }
+
+  getProxyUrls(params: ProxyKeyParams): string[] {
+    const proxyKey = Registry.buildProxyKey(params);
+    const reduceFilters = Registry.reduceUrls.bind(null, proxyKey);
+    const filteredUrls = this.proxies.reduce(reduceFilters, new Set());
+    return Array.from(filteredUrls);
+  }
+
+  static toProxyConfigMatch(proxyConfig: ProxyConfig): ProxyConfigMatch {
+    return {
+      url: proxyConfig.url,
+      include: proxyConfig.include?.map(Registry.toMatch) ?? [],
+      exclude: proxyConfig.exclude?.map(Registry.toMatch) ?? [],
+    };
+  }
+
+  static toMatch(value: string): MatchFunction {
+    return match(value);
+  }
+
+  static buildProxyKey(params: ProxyKeyParams): string {
+    const { npmCommand, pkgScope, pkgName } = params;
+    const tail = path.join(npmCommand ?? "", pkgScope ?? "", pkgName ?? "");
+    return "/" + tail;
+  }
+
+  static reduceUrls(
+    proxyKey: string,
+    memo: Set<string>,
+    proxyMatch: ProxyConfigMatch
+  ): Set<string> {
+    const isMatch = Registry.isMatchProxyKey.bind(null, proxyKey);
+    const isExclude = proxyMatch.exclude.map(isMatch).find(Boolean) ?? false;
+    if (isExclude) return memo;
+
+    const isInclude = proxyMatch.include.map(isMatch).find(Boolean) ?? false;
+    if (isInclude) memo.add(proxyMatch.url);
+    return memo;
+  }
+
+  static isMatchProxyKey(proxyKey: string, match: MatchFunction): boolean {
+    return !!match(proxyKey);
+  }
+
+  static match(path: string, registry: Registry): boolean {
+    return path === registry.path;
+  }
+}
+
+type ProxyConfigMatch = {
+  url: string;
+  include: MatchFunction[];
+  exclude: MatchFunction[];
+};
+
+export type Config = {
   path: string;
   dir: string;
-  proxies: RegistryProxy<T>[];
+  proxies: ProxyConfig[];
 };
 
-export type RegistryProxy<T> = {
+type ProxyConfig = {
   url: string;
-  include?: T[];
-  exclude?: T[];
+  include?: string[];
+  exclude?: string[];
 };
 
-export type RegistryConfig = RegistryCommon<string>;
-
-export type Registry = RegistryCommon<MatchFunction>;
-
-export const findRegistry = (
-  registries: Registry[],
-  registryPath: string
-): Registry | null => {
-  return registries.find(({ path }) => registryPath === path) ?? null;
+type ProxyKeyParams = {
+  npmCommand?: string | null;
+  pkgScope?: string | null;
+  pkgName?: string | null;
 };
 
 export enum RegistryType {
@@ -29,48 +97,3 @@ export enum RegistryType {
   proxy = "proxy",
   unknown = "unknown",
 }
-
-export const getRegistryType = (
-  registry: RegistryConfig | Registry
-): RegistryType => {
-  return registry.proxies.length ? RegistryType.proxy : RegistryType.local;
-};
-
-export const getProxyUrl = (params: GetProxyUrlsParams): string | null => {
-  const urls = getProxyUrls(params);
-  return urls[0] ?? null;
-};
-
-type GetProxyUrlsParams = {
-  registry: Registry;
-  npmCommand?: string | null;
-  pkgScope?: string | null;
-  pkgName?: string | null;
-};
-
-export const getProxyUrls = (params: GetProxyUrlsParams): string[] => {
-  const { registry } = params;
-  const npmCommand = params.npmCommand ?? "";
-  const pkgScope = params.pkgScope ?? "";
-  const pkgName = params.pkgName ?? "";
-  const filteredUrls: string[] = [];
-  const key = "/" + path.join(npmCommand, pkgScope, pkgName);
-  for (const config of registry.proxies) {
-    const { include = [], exclude = [] } = config;
-    const isInclude =
-      include.map((match) => !!match(key)).find((value) => value) ?? false;
-    const isExclude =
-      exclude.map((match) => !!match(key)).find((value) => value) ?? false;
-    if (isInclude && !isExclude) filteredUrls.push(config.url);
-  }
-  return Array.from(new Set(filteredUrls));
-};
-
-export const createRegistry = (config: RegistryConfig): Registry => {
-  const proxies = config.proxies.map((config) => ({
-    ...config,
-    include: config.include?.map((item) => match(item)) ?? [],
-    exclude: config.exclude?.map((item) => match(item)) ?? [],
-  }));
-  return { ...config, proxies };
-};
