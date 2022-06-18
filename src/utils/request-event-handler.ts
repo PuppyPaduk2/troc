@@ -1,8 +1,15 @@
 import * as http from "http";
 
-import { RequestEvent } from "../../../utils/request-event";
+import { RequestEvent } from "./request-event";
 
-// import { RequestEvent } from "../request-event";
+export const createRequestEventHandler =
+  (handlers: RequestEventHandlers): RequestEventHandler =>
+  async (event, params) => {
+    const handler = handlers[event.key.value];
+    if (!handler) return;
+
+    return await handler(event, params);
+  };
 
 export type ResponseCallback = (() => Promise<void> | void) | null | void;
 

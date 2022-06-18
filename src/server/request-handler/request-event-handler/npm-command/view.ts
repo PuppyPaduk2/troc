@@ -2,6 +2,10 @@ import { accessSoft, readFileSoft, writeFile } from "../../../../utils/fs";
 import { NpmPackageInfoInstall } from "../../../../utils/npm";
 import { getIncomingMessageJson } from "../../../../utils/request";
 import {
+  RequestEventHandler,
+  RequestEventHandlers,
+} from "../../../../utils/request-event-handler";
+import {
   NpmCommand,
   PkgAction,
   RegistryType,
@@ -9,7 +13,6 @@ import {
   RequestType,
 } from "../../../../utils/request-key";
 import { attachResponse } from "../../../../utils/response";
-import { RequestEventHandler, RequestEventHandlers } from "../types";
 import { getPkgTarballUrl } from "./utils/pkg";
 import { redirectNpmRequest } from "./utils/request";
 

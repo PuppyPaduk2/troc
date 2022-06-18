@@ -3,12 +3,12 @@ import * as http from "http";
 import { parseNpmCommand } from "../../utils/npm-command";
 import { Registry } from "../../utils/registry";
 import { RequestEvent } from "../../utils/request-event";
-import { sendBadRequest, sendNotFound } from "../../utils/response";
-import { parseUrl } from "../../utils/url";
 import {
   RequestEventHandler,
   ResponseCallback,
-} from "./request-event-handler/types";
+} from "../../utils/request-event-handler";
+import { sendBadRequest, sendNotFound } from "../../utils/response";
+import { parseUrl } from "../../utils/url";
 
 type RequestHandlerOptions = {
   registries: Registry[];

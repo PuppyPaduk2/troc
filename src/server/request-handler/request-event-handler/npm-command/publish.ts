@@ -13,13 +13,16 @@ import {
   getIncomingMessageJson,
 } from "../../../../utils/request";
 import {
+  RequestEventHandler,
+  RequestEventHandlers,
+} from "../../../../utils/request-event-handler";
+import {
   NpmCommand,
   RegistryType,
   RequestKey,
   RequestType,
 } from "../../../../utils/request-key";
 import { attachResponse } from "../../../../utils/response";
-import { RequestEventHandler, RequestEventHandlers } from "../types";
 import { redirectNpmRequest } from "./utils/request";
 
 const publishKey = new RequestKey({
