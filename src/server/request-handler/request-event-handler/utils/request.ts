@@ -35,9 +35,8 @@ const getOptions = (
   });
   if (!targetUrl) return new Error("Target url  doesn't exist");
 
-  // TODO Get url by parsedUrl
   const targetURL = new URL(targetUrl);
-  const requestUrl = decodeURIComponent(request.url ?? "");
+  const requestUrl = event.parsedUrl.origin;
   targetURL.pathname = path.join(
     targetURL.pathname,
     requestUrl.replace(event.registry.path, "")
