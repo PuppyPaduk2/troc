@@ -1,5 +1,6 @@
 import * as http from "http";
 
+import { parseNpmCommand } from "../../../utils/npm-command";
 import { PkgPath } from "../../../utils/pkg-path";
 import { findRegistry, Registry } from "../../../utils/registry";
 import { NpmCommand, RequestKey } from "../../../utils/request-key";
@@ -26,12 +27,14 @@ export const getRequestEvent = (
   const registry = findRegistry(registries, parsedUrl.registryPath);
   if (!registry) return new Error("Registry doesn't exist");
 
-  const requestKeyParams = RequestKey.buildParams({
-    referer: request.headers.referer,
-    parsedUrl,
-    registry,
-  });
-  const key = new RequestKey(requestKeyParams);
+  const npmCommand = parseNpmCommand(request.headers.referer);
+  const key = new RequestKey(
+    RequestKey.buildParams({
+      parsedUrl,
+      registry,
+      npmCommand,
+    })
+  );
   const pkgPath = new PkgPath({
     baseDir: registry.dir,
     basePathnameDir: registry.path,
@@ -39,6 +42,5 @@ export const getRequestEvent = (
     pkgName: parsedUrl.pkgName,
     tarballVersion: parsedUrl.tarballVersion,
   });
-  const { npmCommand } = requestKeyParams;
   return { parsedUrl, registry, key, npmCommand, pkgPath };
 };

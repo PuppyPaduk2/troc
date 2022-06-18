@@ -1,4 +1,4 @@
-import { NpmCommand, parseNpmCommand } from "./npm-command";
+import { NpmCommand } from "./npm-command";
 import { buildPkgAction, PkgAction } from "./pkg-action";
 import { getRegistryType, Registry, RegistryType } from "./registry";
 import { buildRequestType, RequestType } from "./request-type";
@@ -7,7 +7,7 @@ import { ParsedUrl } from "./url";
 export { NpmCommand, PkgAction, RegistryType, RequestType };
 
 export class RequestKey {
-  private _params: RequestKeyParams = {
+  params: RequestKeyParams = {
     registryType: RegistryType.unknown,
     requestType: RequestType.unknown,
     npmCommand: null,
@@ -17,29 +17,29 @@ export class RequestKey {
   };
 
   constructor(params: Partial<RequestKeyParams>) {
-    this._params = { ...this._params, ...params };
+    this.params = Object.freeze({ ...this.params, ...params });
   }
 
   get value(): string {
     const chunks: ChunkValue[] = [];
-    switch (this._params.requestType) {
+    switch (this.params.requestType) {
       case RequestType.npmCommand:
         chunks.push(
-          this._params.requestType,
-          this._params.npmCommand,
-          this._params.registryType,
-          this._params.pkgAction
+          this.params.requestType,
+          this.params.npmCommand,
+          this.params.registryType,
+          this.params.pkgAction
         );
         break;
       case RequestType.npmApi:
         chunks.push(
-          this._params.requestType,
-          this._params.apiVersion,
-          this._params.apiPath
+          this.params.requestType,
+          this.params.apiVersion,
+          this.params.apiPath
         );
         break;
       default:
-        chunks.push(this._params.requestType);
+        chunks.push(this.params.requestType);
         break;
     }
     return chunks
@@ -49,7 +49,7 @@ export class RequestKey {
   }
 
   fork(params: Partial<RequestKeyParams>): RequestKey {
-    return new RequestKey({ ...this._params, ...params });
+    return new RequestKey({ ...this.params, ...params });
   }
 
   static chunkSeparator = "/";
@@ -57,10 +57,9 @@ export class RequestKey {
   static buildParams = (params: {
     parsedUrl: ParsedUrl;
     registry: Registry;
-    referer?: string;
+    npmCommand: NpmCommand | null;
   }): RequestKeyParams => {
-    const { parsedUrl, registry, referer } = params;
-    const npmCommand = parseNpmCommand(referer);
+    const { parsedUrl, registry, npmCommand } = params;
     return {
       registryType: getRegistryType(registry),
       requestType: buildRequestType({ parsedUrl, npmCommand }),
