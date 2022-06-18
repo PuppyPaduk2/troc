@@ -10,8 +10,8 @@ import {
 } from "../../../../utils/request-key";
 import { attachResponse } from "../../../../utils/response";
 import { RequestEventHandler, RequestEventHandlers } from "../types";
-import { getPkgTarballUrl } from "../utils/pkg";
-import { redirectNpmRequest } from "../utils/request";
+import { getPkgTarballUrl } from "./utils/pkg";
+import { redirectNpmRequest } from "./utils/request";
 
 const viewKey = new RequestKey({
   requestType: RequestType.npmCommand,

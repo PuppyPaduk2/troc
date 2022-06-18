@@ -1,4 +1,4 @@
-import { PkgPath } from "../../../../utils/pkg-path";
+import { PkgPath } from "../../../../../utils/pkg-path";
 
 export const getPkgTarballUrl = (
   pkgPath: PkgPath,

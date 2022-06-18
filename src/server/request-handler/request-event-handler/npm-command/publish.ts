@@ -20,7 +20,7 @@ import {
 } from "../../../../utils/request-key";
 import { attachResponse } from "../../../../utils/response";
 import { RequestEventHandler, RequestEventHandlers } from "../types";
-import { redirectNpmRequest } from "../utils/request";
+import { redirectNpmRequest } from "./utils/request";
 
 const publishKey = new RequestKey({
   requestType: RequestType.npmCommand,
