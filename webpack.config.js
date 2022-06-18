@@ -14,7 +14,7 @@ module.exports = () => ({
   devtool: "source-map",
   entry: Object.assign({
     cli: path.resolve(cwd, "./src/cli"),
-    run: path.resolve(cwd, "./src/server/run"),
+    run: path.resolve(cwd, "./src/run"),
   }),
   module: {
     rules: [
@@ -48,8 +48,8 @@ module.exports = () => ({
     new ShellPlugin("emit", "node ./scripts/after-build.js"),
     new ForkTsCheckerWebpackPlugin(),
   ].filter(Boolean),
-  optimization: {
-    minimize: true,
-    minimizer: [new TerserPlugin()],
-  },
+  // optimization: {
+  //   minimize: true,
+  //   minimizer: [new TerserPlugin()],
+  // },
 });

@@ -1,6 +1,6 @@
 import * as path from "path";
-import { spawn } from "./cp";
 
+import { spawn } from "./cp";
 import { readFileSoft } from "./fs";
 
 export type NpmTokenResponse = {
@@ -26,6 +26,8 @@ export type PackageDist = {
 };
 
 export type PackageVersion = {
+  name: string;
+  version: string;
   dist: PackageDist;
   _npmUser?: NpmUser;
 };
@@ -59,14 +61,14 @@ export type NpmPackageInfoFull =
   | NpmPackageInfoView
   | NpmPackageInfoPublish;
 
-export type RegistryConfig = Record<string, string> & {
+export type NpmRegistryConfig = Record<string, string> & {
   _authToken?: string;
 };
 
 export async function getRegistryConfig(
   registryUrl: string | URL,
   configFiles?: string[]
-): Promise<RegistryConfig> {
+): Promise<NpmRegistryConfig> {
   const { host, pathname } =
     registryUrl instanceof URL ? registryUrl : new URL(registryUrl);
   const files = configFiles ?? [

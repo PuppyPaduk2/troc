@@ -9,5 +9,5 @@
     "target": "ES5",
     "outDir": "./dist"
   },
-  "exclude": ["node_modules"]
+  "exclude": ["node_modules", "src/_server-next"]
 }
