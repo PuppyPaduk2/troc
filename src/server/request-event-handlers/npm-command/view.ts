@@ -1,18 +1,18 @@
-import { accessSoft, readFileSoft, writeFile } from "../../../../utils/fs";
-import { NpmPackageInfoInstall } from "../../../../utils/npm";
-import { getIncomingMessageJson } from "../../../../utils/request";
+import { accessSoft, readFileSoft, writeFile } from "../../../utils/fs";
+import { NpmPackageInfoInstall } from "../../../utils/npm";
+import { getIncomingMessageJson } from "../../../utils/request";
 import {
   RequestEventHandler,
   RequestEventHandlers,
-} from "../../../../utils/request-event-handler";
+} from "../../../utils/request-event-handler";
 import {
   NpmCommand,
   PkgAction,
   RegistryType,
   RequestKey,
   RequestType,
-} from "../../../../utils/request-key";
-import { attachResponse } from "../../../../utils/response";
+} from "../../../utils/request-key";
+import { attachResponse } from "../../../utils/response";
 import { getPkgTarballUrl } from "./utils/pkg";
 import { redirectNpmRequest } from "./utils/request";
 

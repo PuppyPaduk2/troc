@@ -5,24 +5,24 @@ import {
   readJson,
   writeBase64,
   writeFile,
-} from "../../../../utils/fs";
-import { NpmPackageInfo, NpmPackageInfoPublish } from "../../../../utils/npm";
-import { removeProps } from "../../../../utils/object";
+} from "../../../utils/fs";
+import { NpmPackageInfo, NpmPackageInfoPublish } from "../../../utils/npm";
+import { removeProps } from "../../../utils/object";
 import {
   getIncomingMessageData,
   getIncomingMessageJson,
-} from "../../../../utils/request";
+} from "../../../utils/request";
 import {
   RequestEventHandler,
   RequestEventHandlers,
-} from "../../../../utils/request-event-handler";
+} from "../../../utils/request-event-handler";
 import {
   NpmCommand,
   RegistryType,
   RequestKey,
   RequestType,
-} from "../../../../utils/request-key";
-import { attachResponse } from "../../../../utils/response";
+} from "../../../utils/request-key";
+import { attachResponse } from "../../../utils/response";
 import { redirectNpmRequest } from "./utils/request";
 
 const publishKey = new RequestKey({

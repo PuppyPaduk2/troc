@@ -1,7 +1,7 @@
 import * as http from "http";
 import * as path from "path";
 
-import { createRequestHandler, requestEventHandlers } from "./server";
+import { requestEventHandlers } from "./server";
 import { logTimeMs } from "./utils/log";
 import { getPort } from "./utils/net";
 import { Registry } from "./utils/registry";
@@ -9,6 +9,7 @@ import {
   createRequestEventHandler,
   RequestEventHandler,
 } from "./utils/request-event-handler";
+import { createRequestHandler } from "./utils/request-handler";
 
 const server = http.createServer();
 const dir = path.join(__dirname, "storage-root");
@@ -104,9 +105,9 @@ getPort(4000).then((port) => {
     console.log("Listening http://localhost:" + port);
   });
   const baseRequestEventHandler = createRequestEventHandler({
-    ...requestEventHandlers.view,
-    ...requestEventHandlers.install,
-    ...requestEventHandlers.publish,
+    ...requestEventHandlers.npmCommand.view,
+    ...requestEventHandlers.npmCommand.install,
+    ...requestEventHandlers.npmCommand.publish,
   });
   const requestHandler = createRequestHandler({
     registries: Object.values(registries),

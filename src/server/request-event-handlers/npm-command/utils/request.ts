@@ -1,15 +1,15 @@
 import * as http from "http";
 import * as path from "path";
 
-import { removeProps, removePropsEmpty } from "../../../../../utils/object";
+import { removeProps, removePropsEmpty } from "../../../../utils/object";
 import {
   getIncomingMessageData,
   RedirectedRequest,
   redirectRequest,
   requestToOptions,
   urlToOptions,
-} from "../../../../../utils/request";
-import { RequestEvent } from "../../../../../utils/request-event";
+} from "../../../../utils/request";
+import { RequestEvent } from "../../../../utils/request-event";
 
 export const redirectNpmRequest = async (
   event: RequestEvent,
