@@ -6,7 +6,9 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "webpack",
-    "start": "webpack --watch"
+    "start": "webpack --watch",
+    "lint": "eslint ./src",
+    "prepare": "husky install"
   },
   "author": "",
   "license": "ISC",
@@ -29,7 +31,6 @@
     "@typescript-eslint/parser": "^5.15.0",
     "babel-loader": "^8.2.3",
     "chalk": "^4.1.2",
-    "colors": "^1.4.0",
     "commander": "^9.0.0",
     "eslint": "^8.11.0",
     "eslint-config-prettier": "^8.5.0",
@@ -38,6 +39,7 @@
     "eslint-plugin-simple-import-sort": "7.0.0",
     "find-process": "1.4.7",
     "fork-ts-checker-webpack-plugin": "^7.2.1",
+    "husky": "8.0.1",
     "merge": "^2.1.1",
     "node-fetch": "2.6.7",
     "nodemon-webpack-plugin": "^4.7.1",
