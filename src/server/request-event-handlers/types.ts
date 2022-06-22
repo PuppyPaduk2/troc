@@ -1,6 +1,6 @@
 import { IncomingMessage, ServerResponse } from "http";
 
-import { Handler, Handlers } from "../../utils/request-event-handler-n";
+import { Handler, Handlers } from "../../utils/request-event-handler";
 
 export type RequestEventHandler = Handler<Payload, Result>;
 

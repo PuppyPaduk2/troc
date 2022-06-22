@@ -8,13 +8,12 @@ import * as path from "path";
 
 import { Config as RegistryConfig, Registry } from "../utils/registry";
 import { RequestEvent } from "../utils/request-event";
-import { createHandler as createRequestEventHandler } from "../utils/request-event-handler-n";
 import { attachResponse } from "../utils/response";
 import {
+  npmCommandHandlers,
   RequestEventHandler,
-  requestEventHandlers,
-} from "./request-event-handlers-n";
-import { createHandler as createRequestEventHandlerPipe } from "./request-event-handlers-n/utils/request-event-handler";
+} from "./request-event-handlers";
+import { createHandler as createRequestEventHandlerPipe } from "./request-event-handlers/utils/request-event-handler";
 
 export const createServer = (config: {
   storageDir: string;
@@ -30,11 +29,7 @@ export const createServer = (config: {
   const server = createHttpServer();
   const requestEventHandler = createRequestEventHandlerPipe([
     ...(config.requestEventHandlers?.before ?? []),
-    createRequestEventHandler({
-      ...requestEventHandlers.npmCommands.view,
-      ...requestEventHandlers.npmCommands.install,
-      ...requestEventHandlers.npmCommands.publish,
-    }),
+    npmCommandHandlers,
     ...(config.requestEventHandlers?.after ?? []),
   ]);
   const requestHandler: RequestHandler = async (request, response) => {

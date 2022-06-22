@@ -1,7 +1,7 @@
-import { createServerWithoutAuthN } from "./server";
+import { createServerWithoutAuth } from "./server";
 import { getPort } from "./utils/net";
 
-const { server } = createServerWithoutAuthN({
+const { server } = createServerWithoutAuth({
   storageDir: "./storage-root",
   registries: [
     {

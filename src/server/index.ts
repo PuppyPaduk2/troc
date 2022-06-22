@@ -1,1 +1,1 @@
-export { createServer as createServerWithoutAuthN } from "./server-without-auth-n";
+export { createServer as createServerWithoutAuth } from "./server-without-auth";
