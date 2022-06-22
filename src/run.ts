@@ -86,9 +86,9 @@ const { server } = createServerWithoutAuthN({
   ],
   requestEventHandlers: {
     before: [
-      async (event) => {
-        console.log(event);
-      },
+      // async (event) => {
+      //   console.log(event);
+      // },
     ],
     after: [],
   },
