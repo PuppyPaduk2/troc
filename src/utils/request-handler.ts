@@ -1,26 +1,19 @@
 import * as http from "http";
 
-import { parseNpmCommand } from "./npm-command";
 import { Registry } from "./registry";
 import { RequestEvent } from "./request-event";
 import { RequestEventHandler, ResponseCallback } from "./request-event-handler";
-import {
-  sendBadRequest,
-  sendNotFound,
-  SendWithAttachedResponse,
-} from "./response";
-import { parseUrl } from "./url";
+import { sendBadRequest, sendNotFound } from "./response";
 
 export const createRequestHandler =
   (options: CreateRequestHandlerOptions): RequestHandler =>
   async (request, response) => {
-    const { registries } = options;
-    const requestEvent = createRequestEvent({
-      registries,
-      request,
-      response,
+    const requestEvent = RequestEvent.create({
+      registries: options.registries,
+      url: request.url,
+      referer: request.headers.referer,
     });
-    if (requestEvent instanceof Function) return requestEvent();
+    if (requestEvent === null) return sendBadRequest(response)();
 
     const { requestEventHandlers } = options;
     const responseCallback = await handleRequestEvent({
@@ -42,23 +35,6 @@ export type RequestHandler = (
   request: http.IncomingMessage,
   response: http.ServerResponse
 ) => Promise<void>;
-
-const createRequestEvent = (params: {
-  registries: Registry[];
-  request: http.IncomingMessage;
-  response: http.ServerResponse;
-}): RequestEvent | SendWithAttachedResponse => {
-  const { request, registries, response } = params;
-  const parsedUrl = parseUrl(request.url);
-  const registry = RequestEvent.findRegistry(registries, parsedUrl);
-  if (!registry) return sendBadRequest(response);
-
-  return new RequestEvent({
-    npmCommand: parseNpmCommand(request.headers.referer),
-    parsedUrl,
-    registry,
-  });
-};
 
 const handleRequestEvent = async (params: {
   requestEventHandlers: RequestEventHandler[];
