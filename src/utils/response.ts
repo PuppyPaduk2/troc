@@ -26,7 +26,7 @@ export type AttachedResponse = {
   serviceUnavailable: SendWithAttachedResponse;
 };
 
-type SendWithAttachedResponse = (params?: Partial<SendParams>) => void;
+export type SendWithAttachedResponse = (params?: Partial<SendParams>) => void;
 
 export const attachResponse = (
   response: http.ServerResponse
@@ -38,8 +38,6 @@ export const attachResponse = (
   notFound: sendNotFound(response),
   serviceUnavailable: sendServiceUnavailable(response),
 });
-
-type SendWithCode = Send<Partial<SendParams> | void>;
 
 export const sendOk: SendWithCode = (response) => (params) =>
   send(response)({ statusCode: 200, ...params });
@@ -55,3 +53,5 @@ export const sendNotFound: SendWithCode = (response) => (params) =>
 
 export const sendServiceUnavailable: SendWithCode = (response) => (params) =>
   send(response)({ statusCode: 503, end: "Service unavailable", ...params });
+
+export type SendWithCode = Send<Partial<SendParams> | void>;

@@ -1,8 +1,8 @@
-import { NpmCommand } from "./npm-command";
+import { NpmCommand, parseNpmCommand } from "./npm-command";
 import { PkgPath } from "./pkg-path";
 import { Registry } from "./registry";
 import { RequestKey } from "./request-key";
-import { ParsedUrl } from "./url";
+import { ParsedUrl, parseUrl } from "./url";
 
 export class RequestEvent {
   parsedUrl: ParsedUrl;
@@ -11,10 +11,10 @@ export class RequestEvent {
   key: RequestKey;
   pkgPath: PkgPath;
 
-  constructor(params: RequestEventParams) {
-    this.parsedUrl = params.parsedUrl;
-    this.registry = params.registry;
-    this.npmCommand = params.npmCommand;
+  constructor(params: RequestEventParams = {}) {
+    this.parsedUrl = parseUrl(params.url);
+    this.registry = this._findRegistry(params.registries ?? []);
+    this.npmCommand = parseNpmCommand(params.referer);
     this.key = new RequestKey(
       RequestKey.buildParams({
         registry: this.registry,
@@ -31,6 +31,12 @@ export class RequestEvent {
     });
   }
 
+  private _findRegistry(registries: Registry[]): Registry {
+    const registry = RequestEvent.findRegistry(registries, this.parsedUrl);
+    if (!registry) throw new Error("Registry didn't find");
+    return registry;
+  }
+
   static findRegistry(
     registries: Registry[],
     parsedUrl: ParsedUrl
@@ -38,10 +44,18 @@ export class RequestEvent {
     const findRegistry = Registry.match.bind(null, parsedUrl.registryPath);
     return registries.find(findRegistry) ?? null;
   }
+
+  static create(params: RequestEventParams): RequestEvent | null {
+    try {
+      return new RequestEvent(params);
+    } catch {
+      return null;
+    }
+  }
 }
 
 type RequestEventParams = {
-  parsedUrl: ParsedUrl;
-  registry: Registry;
-  npmCommand: NpmCommand | null;
+  url?: string;
+  referer?: string;
+  registries?: Registry[];
 };
