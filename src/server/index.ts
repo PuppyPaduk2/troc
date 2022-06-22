@@ -1,5 +1,1 @@
-import { npmCommandHandlers } from "./request-event-handlers/npm-command";
-
-export const requestEventHandlers = {
-  npmCommand: npmCommandHandlers,
-};
+export { createServer as createServerWithoutAuth } from "./server-without-auth";

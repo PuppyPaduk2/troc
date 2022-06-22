@@ -38,12 +38,12 @@ type CreateRequestHandlerOptions = {
   requestEventHandlers: RequestEventHandler[];
 };
 
-type RequestHandler = (
+export type RequestHandler = (
   request: http.IncomingMessage,
   response: http.ServerResponse
 ) => Promise<void>;
 
-export const createRequestEvent = (params: {
+const createRequestEvent = (params: {
   registries: Registry[];
   request: http.IncomingMessage;
   response: http.ServerResponse;
