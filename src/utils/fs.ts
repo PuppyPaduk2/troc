@@ -60,3 +60,12 @@ export async function writeBase64(
 export async function mkdir(file: string): Promise<string | void> {
   return fs.mkdir(file, { recursive: true });
 }
+
+export async function removeFile(file: string): Promise<boolean> {
+  try {
+    await fs.unlink(file);
+    return true;
+  } catch {
+    return false;
+  }
+}
