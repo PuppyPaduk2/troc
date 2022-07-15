@@ -66,6 +66,10 @@ export class Registry {
   static match(path: string, registry: Registry): boolean {
     return path === registry.path;
   }
+
+  static create(config: Config): Registry {
+    return new Registry(config);
+  }
 }
 
 type ProxyConfigMatch = {
@@ -80,7 +84,7 @@ export type Config = {
   proxies: ProxyConfig[];
 };
 
-type ProxyConfig = {
+export type ProxyConfig = {
   url: string;
   include?: string[];
   exclude?: string[];

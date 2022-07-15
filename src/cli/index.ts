@@ -1,79 +1,65 @@
 import { program } from "commander";
-import * as path from "path";
 
-import { version } from "../../package.json";
-import { getNpmConfigValue, getRegistryConfig } from "../utils/npm";
-import { fetch, Response } from "../utils/fetch";
+import * as pkg from "../../package.json";
+import { createServerWithoutAuth } from "../server";
+import { getPort } from "../utils/net";
+import { read as readConfig, write as writeConfig } from "./config/fs";
+import {
+  attach as attachNpmrc,
+  detach as detachNpmrc,
+  remove as removeNpmrc,
+  set as setNpmrc,
+} from "./config/npmrc";
+import {
+  remove as removePackages,
+  set as setPackages,
+} from "./config/packages";
+import {
+  remove as removeRegistries,
+  set as setRegistries,
+} from "./config/registries";
+import { Options, options } from "./options";
 
 program
-  .command("signup <name> <password> <email>")
-  .description("Signup to registry on troc-server")
-  .option("--registry <registryUrl>", "Registry url")
-  .action(async (name, password, email, { registry }) => {
-    const href = await getFetchHref("/v1/signup", registry);
-    const res = await fetch(href, {
-      method: "POST",
-      body: JSON.stringify({ name, password, email }),
-    });
-
-    if (isSuccessful(res)) {
-      console.log("Signup success");
-    } else {
-      console.log("Signup failure");
-    }
+  .command("install")
+  .alias("i")
+  .addOption(options.configPath)
+  .action(async (options: Options["configPath"]) => {
+    const config = await readConfig(options.config);
+    await setPackages(config);
+    await setNpmrc(config);
+    await setRegistries(config);
+    await writeConfig(options.config, config);
+    await attachNpmrc(config);
   });
 
 program
-  .command("attach-token <targetRegistryUrl>")
-  .description("Attach token to proxy server for work with proxy services")
-  .option("--registry <registryUrl>", "Registry url")
-  .action(async (targetRegistryUrl, { registry }) => {
-    const { _authToken } = await getRegistryConfig(targetRegistryUrl);
-
-    if (!_authToken) {
-      console.log("Please login to", targetRegistryUrl, "through `npm login`");
-      return;
-    }
-
-    const registryUrl = await getNpmRegistryUrl(registry);
-    const href = await getFetchHref("/v1/attach-token", registryUrl.href);
-    const configRegistry = await getRegistryConfig(registryUrl.href);
-    const res = await fetch(href, {
-      method: "POST",
-      headers: {
-        authorization: configRegistry._authToken ?? "",
-      },
-      body: JSON.stringify({
-        registryUrl: targetRegistryUrl,
-        token: _authToken,
-      }),
-    });
-
-    if (isSuccessful(res)) {
-      console.log("Attaching token success");
-    } else {
-      console.log("Attaching token failure", res.status);
-    }
+  .command("uninstall")
+  .alias("un")
+  .addOption(options.configPath)
+  .action(async (options: Options["configPath"]) => {
+    const config = await readConfig(options.config);
+    await detachNpmrc(config);
+    await removePackages(config);
+    await removeNpmrc(config);
+    await removeRegistries(config);
+    await writeConfig(options.config, config);
   });
 
-program.version(version).parse(process.argv);
+program
+  .command("start")
+  .addOption(options.configPath)
+  .action(async (options: Options["configPath"]) => {
+    const config = await readConfig(options.config);
+    const { server } = createServerWithoutAuth({
+      registries: Object.values(config.registries),
+    });
+    const port = await getPort(config.port);
 
-// Utils
-async function getFetchHref(
-  pathname: string,
-  registry?: string
-): Promise<string> {
-  const registryUrl = await getNpmRegistryUrl(registry);
+    server.addListener("listening", () => {
+      console.log("Listening http://localhost:" + port);
+    });
+    server.listen(port);
+  });
 
-  registryUrl.pathname = path.join(registryUrl.pathname, "/-/troc", pathname);
-  return registryUrl.href;
-}
-
-async function getNpmRegistryUrl(registry?: string): Promise<URL> {
-  if (registry) return new URL(registry);
-  return new URL(await getNpmConfigValue("registry"));
-}
-
-function isSuccessful(res: Response): boolean {
-  return res.status >= 200 && res.status < 300;
-}
+program.version(pkg.version).parse(process.argv);

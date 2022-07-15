@@ -1,7 +1,7 @@
 import * as path from "path";
 
 import { spawn } from "./cp";
-import { readFileSoft } from "./fs";
+import { readFileSoft, readJson } from "./fs";
 
 export type NpmTokenResponse = {
   ok: boolean;
@@ -73,8 +73,8 @@ export async function getRegistryConfig(
     registryUrl instanceof URL ? registryUrl : new URL(registryUrl);
   const files = configFiles ?? [
     path.join(process.cwd(), ".npmrc"),
-    await getNpmConfigValue("userconfig"),
-    await getNpmConfigValue("globalconfig"),
+    await getNpmUserConfigPath(),
+    await getNpmGlobalConfigPath(),
   ];
   const data = await Promise.all(files.reverse().map(readFileSoft));
   const lines = Buffer.concat(data).toString().trim().split("\n");
@@ -86,7 +86,15 @@ export async function getRegistryConfig(
   return Object.fromEntries(entries);
 }
 
-export async function getNpmConfigValue(
+export const getNpmUserConfigPath = (): Promise<string> => {
+  return getNpmConfigPath("userconfig");
+};
+
+export const getNpmGlobalConfigPath = (): Promise<string> => {
+  return getNpmConfigPath("globalconfig");
+};
+
+export async function getNpmConfigPath(
   key: string,
   cwd: string = process.cwd()
 ): Promise<string> {
@@ -104,3 +112,12 @@ export async function getNpmConfigValue(
 function getRegistryRegExp(host: string): RegExp {
   return new RegExp(`^//${host.replace(/\/+$/, "")}/:([\\w\\d_-]*)=(.*)`);
 }
+
+export type PackageJson = {
+  name: string;
+  version: string;
+};
+
+export const readPackageJson = (file: string): Promise<PackageJson | null> => {
+  return readJson(file);
+};

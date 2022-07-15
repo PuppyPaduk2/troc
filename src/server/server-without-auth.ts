@@ -4,7 +4,6 @@ import {
   Server,
   ServerResponse,
 } from "http";
-import * as path from "path";
 
 import { Config as RegistryConfig, Registry } from "../utils/registry";
 import { RequestEvent } from "../utils/request-event";
@@ -16,7 +15,6 @@ import {
 import { createHandler as createRequestEventHandlerPipe } from "./request-event-handlers/utils/request-event-handler";
 
 export const createServer = (config: {
-  storageDir: string;
   registries: RegistryConfig[];
   requestEventHandlers?: {
     before: RequestEventHandler[];
@@ -37,10 +35,7 @@ export const createServer = (config: {
     const event = RequestEvent.create({
       url: request.url,
       referer: request.headers.referer,
-      registries: createRegistries({
-        storageDir: config.storageDir,
-        registries: config.registries,
-      }),
+      registries: config.registries.map(Registry.create),
     });
     if (!event) return send.notFound();
 
@@ -59,15 +54,3 @@ type RequestHandler = (
   request: IncomingMessage,
   response: ServerResponse
 ) => Promise<void>;
-
-const createRegistries = (params: {
-  storageDir: string;
-  registries: RegistryConfig[];
-}): Registry[] =>
-  params.registries.map(toRegistry.bind(null, params.storageDir));
-
-const toRegistry = (storageDir: string, config: RegistryConfig): Registry =>
-  new Registry({
-    ...config,
-    dir: path.resolve(storageDir, config.dir),
-  });
