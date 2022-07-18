@@ -5,10 +5,6 @@ import { readJson, writeJson } from "../../utils/fs";
 import { getPort } from "../../utils/net";
 import { Config as RegistryConfig } from "../../utils/registry";
 
-export const getPath = (path: string): string => {
-  return resolve(process.cwd(), path);
-};
-
 export const getDefault = async (): Promise<Config> => ({
   version: version,
   storageDir: resolve(__dirname, "./storage"),
@@ -22,8 +18,12 @@ export const getDefault = async (): Promise<Config> => ({
 export const read = async (file: string): Promise<Config> => {
   return {
     ...(await getDefault()),
-    ...(await readJson<Config>(file)),
+    ...(await readJson<Config>(getPath(file))),
   };
+};
+
+export const getPath = (path: string): string => {
+  return resolve(process.cwd(), path);
 };
 
 export const write = (file: string, config: Config) => {

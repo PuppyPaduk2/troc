@@ -9,7 +9,11 @@ export const createOption = (
 
 export type Options = {
   configPath: { config: string };
-  writeConfig: { write: boolean };
+  setPackages: { packages: boolean };
+  setNpmrc: { npmrc: boolean };
+  setRegistries: { registries: boolean };
+  write: { write: boolean };
+  print: { print: boolean };
 };
 
 export const options: Record<keyof Options, Option> = {
@@ -18,9 +22,29 @@ export const options: Record<keyof Options, Option> = {
     description: "Path to config file",
     defaultValue: resolve(__dirname, "config.json"),
   }),
-  writeConfig: createOption({
-    flags: "-w, --write",
-    description: "Write to config",
+  setPackages: createOption({
+    flags: "--no-packages",
+    description: "Setup packages",
     defaultValue: true,
+  }),
+  setNpmrc: createOption({
+    flags: "--no-npmrc",
+    description: "Setup npmrc",
+    defaultValue: true,
+  }),
+  setRegistries: createOption({
+    flags: "--no-registries",
+    description: "Setup registries",
+    defaultValue: true,
+  }),
+  write: createOption({
+    flags: "--no-write",
+    description: "No write to config",
+    defaultValue: true,
+  }),
+  print: createOption({
+    flags: "-p, --print",
+    description: "Print in terminal",
+    defaultValue: false,
   }),
 };
