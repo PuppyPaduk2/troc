@@ -3,7 +3,7 @@ import { resolve } from "path";
 import { version } from "../../../package.json";
 import { readJson, writeJson } from "../../utils/fs";
 import { getPort } from "../../utils/net";
-import { Config as RegistryConfig } from "../../utils/registry";
+import { Config } from "./types";
 
 export const getDefault = async (): Promise<Config> => ({
   version: version,
@@ -29,25 +29,3 @@ export const getPath = (path: string): string => {
 export const write = (file: string, config: Config) => {
   return writeJson(file, config, null, 2);
 };
-
-export type Config = {
-  version: string;
-  storageDir: string;
-  port: number;
-  localPathname: string;
-  packages: Record<PackageName, PackageMeta>;
-  npmrcs: Record<Hash, Base64>;
-  registries: Record<RegistryKey, RegistryConfig>;
-};
-
-export type PackageName = string;
-export type PackageMeta = {
-  dir: string;
-  version: string;
-  npmrc: Hash;
-  registry: Hash;
-};
-
-export type RegistryKey = string;
-export type Hash = string;
-export type Base64 = string;

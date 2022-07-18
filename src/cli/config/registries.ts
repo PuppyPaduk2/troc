@@ -3,7 +3,7 @@ import { join } from "path";
 import { readFileSoft } from "../../utils/fs";
 import { getNpmGlobalConfigPath, getNpmUserConfigPath } from "../../utils/npm";
 import { Config as RegistryConfig } from "../../utils/registry";
-import { Base64, Config, Hash, PackageMeta, PackageName } from "./fs";
+import { Base64, Config, Hash, PackageMeta, PackageName } from "./types";
 
 export const remove = async (config: Config): Promise<void> => {
   const registryKeys = Object.values(config.packages).map(
