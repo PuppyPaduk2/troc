@@ -3,7 +3,11 @@ import { program } from "commander";
 import * as pkg from "../../package.json";
 import { createServerWithoutAuth } from "../server";
 import { getPort } from "../utils/net";
-import { read as readConfig, write as writeConfig } from "./config/fs";
+import {
+  getPath as getPathConfig,
+  read as readConfig,
+  write as writeConfig,
+} from "./config/fs";
 import {
   attach as attachNpmrc,
   detach as detachNpmrc,
@@ -25,6 +29,7 @@ program
   .alias("i")
   .addOption(options.configPath)
   .action(async (options: Options["configPath"]) => {
+    console.log(getPathConfig(options.config));
     const config = await readConfig(options.config);
     await setPackages(config);
     await setNpmrc(config);
