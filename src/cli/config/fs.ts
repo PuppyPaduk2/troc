@@ -13,6 +13,7 @@ export const getDefault = async (): Promise<Config> => ({
   packages: {},
   npmrcs: {},
   registries: {},
+  links: {},
 });
 
 export const read = async (file: string): Promise<Config> => {

@@ -8,6 +8,7 @@ export type Config = {
   packages: Record<PackageName, PackageMeta>;
   npmrcs: Record<Hash, Base64>;
   registries: Record<RegistryKey, RegistryConfig>;
+  links: Record<PackageName, PackageName[]>;
 };
 
 export type PackageName = string;
@@ -16,6 +17,7 @@ export type PackageMeta = {
   version: string;
   npmrc: Hash;
   registry: Hash;
+  deps: PackageName[];
 };
 
 export type RegistryKey = string;

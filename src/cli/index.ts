@@ -11,6 +11,7 @@ import {
   read as readConfig,
   write as writeConfig,
 } from "./config/fs";
+import { remove as removeLinks, set as setLinks } from "./config/links";
 import {
   attach as attachNpmrc,
   detach as detachNpmrc,
@@ -36,6 +37,7 @@ configCommand
   .addOption(options.setPackages)
   .addOption(options.setNpmrc)
   .addOption(options.setRegistries)
+  .addOption(options.setLinks)
   .addOption(options.write)
   .addOption(options.print)
   .action(
@@ -44,6 +46,7 @@ configCommand
         Options["setPackages"] &
         Options["setNpmrc"] &
         Options["setRegistries"] &
+        Options["setLinks"] &
         Options["write"] &
         Options["print"]
     ) => {
@@ -51,6 +54,7 @@ configCommand
       if (options.packages) await setPackages(config);
       if (options.npmrc) await setNpmrc(config);
       if (options.registries) await setRegistries(config);
+      if (options.links) await setLinks(config);
       if (options.write) await writeConfig(options.config, config);
       if (options.print) console.log(JSON.stringify(config, null, 2), "\n");
 
@@ -65,6 +69,7 @@ configCommand
   .addOption(options.setPackages)
   .addOption(options.setNpmrc)
   .addOption(options.setRegistries)
+  .addOption(options.setLinks)
   .addOption(options.write)
   .addOption(options.print)
   .action(
@@ -73,6 +78,7 @@ configCommand
         Options["setPackages"] &
         Options["setNpmrc"] &
         Options["setRegistries"] &
+        Options["setLinks"] &
         Options["write"] &
         Options["print"]
     ) => {
@@ -80,6 +86,7 @@ configCommand
       if (options.packages) await removePackages(config);
       if (options.npmrc) await removeNpmrc(config);
       if (options.registries) await removeRegistries(config);
+      if (options.links) await removeLinks(config);
       if (options.write) await writeConfig(options.config, config);
       if (options.print) console.log(JSON.stringify(config, null, 2), "\n");
 
@@ -96,6 +103,7 @@ program
     await setPackages(config);
     await setNpmrc(config);
     await setRegistries(config);
+    await setLinks(config);
     await writeConfig(options.config, config);
     await attachNpmrc(config);
   });
@@ -110,6 +118,7 @@ program
     await removePackages(config);
     await removeNpmrc(config);
     await removeRegistries(config);
+    await removeLinks(config);
     await writeConfig(options.config, config);
   });
 

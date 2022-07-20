@@ -26,6 +26,12 @@ export const set = async (config: Config): Promise<void> => {
         version: json.version,
         npmrc: "",
         registry: "",
+        deps: Array.from(
+          new Set([
+            ...(json.dependencies ? Object.keys(json.dependencies) : []),
+            ...(json.devDependencies ? Object.keys(json.devDependencies) : []),
+          ])
+        ),
       };
     })
   );

@@ -12,6 +12,7 @@ export type Options = {
   setPackages: { packages: boolean };
   setNpmrc: { npmrc: boolean };
   setRegistries: { registries: boolean };
+  setLinks: { links: boolean };
   write: { write: boolean };
   print: { print: boolean };
 };
@@ -35,6 +36,11 @@ export const options: Record<keyof Options, Option> = {
   setRegistries: createOption({
     flags: "--no-registries",
     description: "Setup registries",
+    defaultValue: true,
+  }),
+  setLinks: createOption({
+    flags: "--no-links",
+    description: "Setup links",
     defaultValue: true,
   }),
   write: createOption({
