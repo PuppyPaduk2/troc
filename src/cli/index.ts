@@ -1,7 +1,10 @@
 import { program } from "commander";
+import * as fs from "fs";
+import * as path from "path";
 
 import * as pkg from "../../package.json";
 import { createServerWithoutAuth } from "../server";
+import { getDirHash } from "../utils/dir-hash";
 import { getPort } from "../utils/net";
 import {
   getPath as getPathConfig,
@@ -124,6 +127,26 @@ program
       console.log("Listening http://localhost:" + port);
     });
     server.listen(port);
+  });
+
+program
+  .command("watch")
+  .addOption(options.configPath)
+  .action(async (options: Options["configPath"]) => {
+    const config = await readConfig(options.config);
+    const packages = Object.entries(config.packages);
+
+    packages.forEach(async ([, meta]) => {
+      const dirHash = await getDirHash(meta.dir);
+
+      fs.watch(meta.dir, { recursive: true }, async (_, filename) => {
+        const filePath = path.resolve(meta.dir, filename);
+        const changed = await dirHash.calcFileHash(filePath);
+        if (changed) {
+          console.log(filePath, dirHash.files[filePath]);
+        }
+      });
+    });
   });
 
 program.version(pkg.version).parse(process.argv);

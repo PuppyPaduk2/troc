@@ -1,9 +1,9 @@
-import * as fs from "fs/promises";
+import * as fsp from "fs/promises";
 import * as path from "path";
 
 export async function accessSoft(file: string): Promise<boolean> {
   try {
-    await fs.access(file);
+    await fsp.access(file);
     return true;
   } catch {
     return false;
@@ -12,7 +12,7 @@ export async function accessSoft(file: string): Promise<boolean> {
 
 export async function readFileSoft(file: string): Promise<Buffer> {
   try {
-    return await fs.readFile(file);
+    return await fsp.readFile(file);
   } catch {
     return Buffer.from([]);
   }
@@ -22,7 +22,7 @@ export async function readJson<R extends object>(
   file: string
 ): Promise<R | null> {
   try {
-    return JSON.parse((await fs.readFile(file)).toString());
+    return JSON.parse((await fsp.readFile(file)).toString());
   } catch {
     return null;
   }
@@ -34,10 +34,10 @@ export const writeFile = async (
   options?: WriteFileOptions
 ) => {
   await mkdir(path.dirname(file));
-  return fs.writeFile(file, data, options);
+  return fsp.writeFile(file, data, options);
 };
 
-type WriteFileOptions = Parameters<typeof fs.writeFile>[2];
+type WriteFileOptions = Parameters<typeof fsp.writeFile>[2];
 
 export async function writeJson(
   file: string,
@@ -46,7 +46,10 @@ export async function writeJson(
   replacer?: ((this: any, key: string, value: any) => any) | null,
   space?: string | number
 ): Promise<void> {
-  return fs.writeFile(file, JSON.stringify(data, replacer ?? undefined, space));
+  return fsp.writeFile(
+    file,
+    JSON.stringify(data, replacer ?? undefined, space)
+  );
 }
 
 export async function writeBase64(
@@ -54,16 +57,16 @@ export async function writeBase64(
   data: Buffer | string
 ): Promise<void> {
   await mkdir(path.dirname(file));
-  return await fs.writeFile(file, data, "base64");
+  return await fsp.writeFile(file, data, "base64");
 }
 
 export async function mkdir(file: string): Promise<string | void> {
-  return fs.mkdir(file, { recursive: true });
+  return fsp.mkdir(file, { recursive: true });
 }
 
 export async function removeFile(file: string): Promise<boolean> {
   try {
-    await fs.unlink(file);
+    await fsp.unlink(file);
     return true;
   } catch {
     return false;
