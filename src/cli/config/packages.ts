@@ -2,7 +2,7 @@ import { glob as globGlob } from "glob";
 import { dirname, join, resolve } from "path";
 
 import { readPackageJson } from "../../utils/npm";
-import { Config } from "./fs";
+import { Config } from "./types";
 
 export const remove = async (config: Config): Promise<void> => {
   const dirs = await find(process.cwd());
@@ -26,6 +26,12 @@ export const set = async (config: Config): Promise<void> => {
         version: json.version,
         npmrc: "",
         registry: "",
+        deps: Array.from(
+          new Set([
+            ...(json.dependencies ? Object.keys(json.dependencies) : []),
+            ...(json.devDependencies ? Object.keys(json.devDependencies) : []),
+          ])
+        ),
       };
     })
   );

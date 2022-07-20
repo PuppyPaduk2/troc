@@ -2,7 +2,7 @@ import objectHash from "object-hash";
 import { join } from "path";
 
 import { readFileSoft, removeFile, writeFile } from "../../utils/fs";
-import { Config } from "./fs";
+import { Config } from "./types";
 
 export const detach = async (config: Config): Promise<void> => {
   await Promise.all(

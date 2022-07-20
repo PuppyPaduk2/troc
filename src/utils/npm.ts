@@ -116,6 +116,8 @@ function getRegistryRegExp(host: string): RegExp {
 export type PackageJson = {
   name: string;
   version: string;
+  dependencies?: Record<string, string>;
+  devDependencies?: Record<string, string>;
 };
 
 export const readPackageJson = (file: string): Promise<PackageJson | null> => {
